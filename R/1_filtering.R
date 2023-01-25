@@ -1,0 +1,144 @@
+library(ggplot2)
+library(reshape)
+library(microbiome)
+
+#### preprocessing: filtering and transforming
+PS.l <- readRDS(file = "data/PhyloSeqList_HMHZ_All.Rds")
+PSLab.l <- readRDS(file="data/PhyloSeqList_All_Tax_New.Rds")
+
+# this is our filtering function
+fil <- function(ps){
+    x = phyloseq::taxa_sums(ps)
+    # abundance filtering at 0.005%
+    keepTaxa = (x / sum(x) > 0.00005)
+    summary(keepTaxa)
+    ps = phyloseq::prune_taxa(keepTaxa, ps)
+# plus prevalnce filter at 1%
+    KeepTaxap <- microbiome::prevalence(ps)>0.01
+    ps <- phyloseq::prune_taxa(KeepTaxap, ps)
+# subset samples based on total read count (100 reads)
+#ps <- phyloseq::subset_samples(ps, phyloseq::sample_sums(ps) > 100)
+    ps <- phyloseq::prune_samples(sample_sums(ps)>100, ps)
+    ps
+}
+
+## filtering MA by amplicon
+fPS.l <- list()
+for (i in 1:length(PS.l)) {
+    try(fPS.l[[i]] <- fil(PS.l[[i]]), silent=TRUE)
+}
+
+fPS <- fPS.l[[1]]
+for (i in 2:length(fPS.l)){
+    fPS <- try(merge_phyloseq(fPS,fPS.l[[i]]))
+#    print(fPS)
+}
+
+#### let's transform by amplicon
+PS.lTSS <- list()
+PS.lT <- list()
+
+for (i in 1:length(fPS.l)) {
+    try(PS.lTSS[[i]] <- transform_sample_counts(fPS.l[[i]], function(x) x / sum(x)), silent=TRUE)
+    try(PS.lT[[i]] <- PS.lTSS[[i]], silent=TRUE)
+    try(PS.lT[[i]]@otu_table <- PS.lT[[i]]@otu_table*PS.lT[[i]]@sam_data$Concentration, silent=TRUE)
+}
+
+PS.TSS <- PS.lTSS[[1]]
+for (i in 2:length(PS.lTSS)){
+    PS.TSS <- try(merge_phyloseq(PS.TSS,PS.lTSS[[i]]))
+}
+
+PS.T <- PS.lT[[1]]
+for (i in 2:length(PS.lT)){
+    PS.T <- try(merge_phyloseq(PS.T,PS.lT[[i]]))
+}
+
+############# now for lab dataset
+## filtering MA by amplicon
+fPSLab.l <- list()
+for (i in 1:length(PSLab.l)) {
+    try(fPSLab.l[[i]] <- fil(PSLab.l[[i]]), silent=TRUE)
+}
+
+fPSLab <- fPSLab.l[[1]]
+for (i in 2:length(fPSLab.l)){
+    fPSLab <- try(merge_phyloseq(fPSLab,fPSLab.l[[i]]))
+}
+
+#### let's transform by amplicon
+PSLab.lTSS <- list()
+PSLab.lT <- list()
+
+for (i in 1:length(fPSLab.l)) {
+    try(PSLab.lTSS[[i]] <- transform_sample_counts(fPSLab.l[[i]], function(x) x / sum(x)), silent=TRUE)
+    try(PSLab.lT[[i]] <- PSLab.lTSS[[i]], silent=TRUE)
+    try(PSLab.lT[[i]]@otu_table <- PSLab.lT[[i]]@otu_table*PSLab.lT[[i]]@sam_data$Concentration, silent=TRUE)
+}
+
+PSLab.TSS <- PSLab.lTSS[[1]]
+for (i in 2:length(PSLab.lTSS)){
+    PSLab.TSS <- try(merge_phyloseq(PSLab.TSS,PSLab.lTSS[[i]]))
+}
+
+PSLab.T <- PSLab.lT[[1]]
+for (i in 2:length(PSLab.lT)){
+    PSLab.T <- try(merge_phyloseq(PSLab.T,PSLab.lT[[i]]))
+}
+
+#Wild dataset:
+# PS.T Relative abundances rescaled to sample DNA concentration
+# PS.TSS Relative abundances - total sum scaling
+# fPS filtered dataset
+#Lab dataset:
+# PSLab.T - Relative abundances rescaled to sample DNA concentration
+#PSLab.TSS Relative abundances - total sum scaling
+# fPSLab filtered dataset
+
+
+# Now we want to relabel Eimeria ASV species as in https://github.com/ferreira-scm/Eimeria_AmpSeq/blob/master/R/Wild_8_AssignEim_tree_cor.R
+
+Eim <- readRDS("/SAN/Susanas_den/gitProj/Eimeria_AmpSeq/tmp/Wild/EimeriaSpeciesAssign.RDS")
+
+
+
+
+eim_rn <- which(rownames(PS.T@tax_table) %in% rownames(Eim@tax_table))
+
+# sanity check
+rownames(PS.T@tax_table[eim_rn])== rownames(Eim@tax_table)
+
+PS.T@tax_table[eim_rn, 7] <- Eim@tax_table[,7]
+fPS@tax_table[eim_rn, 7] <- Eim@tax_table[,7]
+PS.TSS@tax_table[eim_rn, 7] <- Eim@tax_table[,7]
+
+## ok now we agglomerate Eimeria species
+PS.T1 <- subset_taxa(PS.T, !Genus%in%"g__Eimeria")
+PS.TE <- subset_taxa(PS.T, Genus%in%"g__Eimeria")
+PS.TE <- tax_glom(PS.TE, "Species")
+PS.T <- merge_phyloseq(PS.TE, PS.T1)
+
+PS.TSS1 <- subset_taxa(PS.TSS, !Genus%in%"g__Eimeria")
+PS.TSSE <- subset_taxa(PS.TSS, Genus%in%"g__Eimeria")
+PS.TSSE <- tax_glom(PS.TSSE, "Species")
+PS.TSS <- merge_phyloseq(PS.TSSE, PS.TSS1)
+
+fPS1 <- subset_taxa(fPS, !Genus%in%"g__Eimeria")
+fPSE <- subset_taxa(fPS, Genus%in%"g__Eimeria")
+fPSE <- tax_glom(fPSE, "Species")
+fPS <- merge_phyloseq(fPSE, fPS1)
+
+# and remove those handlers.
+#maybe move this up, before transforming so that we don't need to do this 3 x
+tax_table(PS.T)[, colnames(tax_table(PS.T))] <- gsub(tax_table(PS.T)[, colnames(tax_table(PS.T))], pattern="[a-z]__", replacement="")
+
+tax_table(PS.TSS)[, colnames(tax_table(PS.TSS))] <- gsub(tax_table(PS.TSS)[, colnames(tax_table(PS.TSS))], pattern="[a-z]__", replacement="")
+
+tax_table(fPS)[, colnames(tax_table(fPS))] <- gsub(tax_table(fPS)[, colnames(tax_table(fPS))], pattern="[a-z]__", replacement="")
+
+
+#### next step: do correlation analysis for each genus, to aglomerate highly correlated ASVs from the same genus --> likely same species
+
+# 174 genus, 174 networks
+
+get_taxa_unique(PS.T, "Genus")

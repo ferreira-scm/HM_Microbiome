@@ -1,0 +1,57 @@
+library(ggplot2)
+library(reshape)
+library(microbiome)
+
+#### preprocessing: filtering and transforming
+
+PS.l <- readRDS(file = "data/PhyloSeqList_HMHZ_All.Rds")
+PSLab.l <- readRDS(file="data/PhyloSeqList_All_Tax_New.Rds")
+
+# this is our filtering function
+fil <- function(ps){
+    x = phyloseq::taxa_sums(ps)
+    # abundance filtering at 0.005%
+    keepTaxa = (x / sum(x) > 0.00005)
+    summary(keepTaxa)
+    ps = phyloseq::prune_taxa(keepTaxa, ps)
+# plus prevalnce filter at 1%
+    KeepTaxap <- microbiome::prevalence(ps)>0.01
+    ps <- phyloseq::prune_taxa(KeepTaxap, ps)
+# subset samples based on total read count (100 reads)
+#ps <- phyloseq::subset_samples(ps, phyloseq::sample_sums(ps) > 100)
+    ps <- phyloseq::prune_samples(sample_sums(ps)>100, ps)
+    ps
+}
+
+## filtering MA by amplicon
+fPS.l <- list()
+for (i in 1:length(PS.l)) {
+    try(fPS.l[[i]] <- fil(PS.l[[i]]), silent=TRUE)
+}
+
+fPS <- fPS.l[[1]]
+for (i in 2:length(fPS.l)){
+    fPS <- try(merge_phyloseq(fPS,fPS.l[[i]]))
+#    print(fPS)
+}
+
+#### let's transform by amplicon
+PS.lTSS <- list()
+PS.lT <- list()
+
+for (i in 1:length(fPS.l)) {
+    try(PS.lTSS[[i]] <- transform_sample_counts(fPS.l[[i]], function(x) x / sum(x)), silent=TRUE)
+    try(PS.lT[[i]] <- PS.lTSS[[i]], silent=TRUE)
+    try(PS.lT[[i]]@otu_table <- PS.lT[[i]]@otu_table*PS.lT[[i]]@sam_data$Concentration, silent=TRUE)
+}
+
+PS.TSS <- PS.lTSS[[1]]
+for (i in 2:length(PS.lTSS)){
+    PS.TSS <- try(merge_phyloseq(PS.TSS,PS.lTSS[[i]]))
+}
+
+PS.T <- PS.lT[[1]]
+for (i in 2:length(PS.lT)){
+    PS.T <- try(merge_phyloseq(PS.T,PS.lT[[i]]))
+}
+
