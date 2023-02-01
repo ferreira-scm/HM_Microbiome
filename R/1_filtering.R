@@ -28,6 +28,13 @@ for (i in 1:length(PS.l)) {
     try(fPS.l[[i]] <- fil(PS.l[[i]]), silent=TRUE)
 }
 
+# and remove those handlers.
+#test <- list()
+for (i in 1:length(fPS.l)) {
+    try(tax_table(fPS.l[[i]])[, colnames(tax_table(fPS.l[[i]]))] <- gsub(tax_table(fPS.l[[i]])[, colnames(tax_table(fPS.l[[i]]))], pattern="[a-z]__", replacement=""), silent=TRUE)
+}
+
+### now pool all amplicons
 fPS <- fPS.l[[1]]
 for (i in 2:length(fPS.l)){
     fPS <- try(merge_phyloseq(fPS,fPS.l[[i]]))
@@ -61,6 +68,12 @@ for (i in 1:length(PSLab.l)) {
     try(fPSLab.l[[i]] <- fil(PSLab.l[[i]]), silent=TRUE)
 }
 
+# and remove those handlers.
+for (i in 1:length(fPSLab.l)) {
+    try(tax_table(fPSLab.l[[i]])[, colnames(tax_table(fPSLab.l[[i]]))] <- gsub(tax_table(fPSLab.l[[i]])[, colnames(tax_table(fPSLab.l[[i]]))], pattern="[a-z]__", replacement=""), silent=TRUE)
+}
+
+# and pooling into one
 fPSLab <- fPSLab.l[[1]]
 for (i in 2:length(fPSLab.l)){
     fPSLab <- try(merge_phyloseq(fPSLab,fPSLab.l[[i]]))
@@ -100,9 +113,6 @@ for (i in 2:length(PSLab.lT)){
 
 Eim <- readRDS("/SAN/Susanas_den/gitProj/Eimeria_AmpSeq/tmp/Wild/EimeriaSpeciesAssign.RDS")
 
-
-
-
 eim_rn <- which(rownames(PS.T@tax_table) %in% rownames(Eim@tax_table))
 
 # sanity check
@@ -113,32 +123,22 @@ fPS@tax_table[eim_rn, 7] <- Eim@tax_table[,7]
 PS.TSS@tax_table[eim_rn, 7] <- Eim@tax_table[,7]
 
 ## ok now we agglomerate Eimeria species
-PS.T1 <- subset_taxa(PS.T, !Genus%in%"g__Eimeria")
-PS.TE <- subset_taxa(PS.T, Genus%in%"g__Eimeria")
+PS.T1 <- subset_taxa(PS.T, !Genus%in%"Eimeria")
+PS.TE <- subset_taxa(PS.T, Genus%in%"Eimeria")
 PS.TE <- tax_glom(PS.TE, "Species")
 PS.T <- merge_phyloseq(PS.TE, PS.T1)
 
-PS.TSS1 <- subset_taxa(PS.TSS, !Genus%in%"g__Eimeria")
-PS.TSSE <- subset_taxa(PS.TSS, Genus%in%"g__Eimeria")
+PS.TSS1 <- subset_taxa(PS.TSS, !Genus%in%"Eimeria")
+PS.TSSE <- subset_taxa(PS.TSS, Genus%in%"Eimeria")
 PS.TSSE <- tax_glom(PS.TSSE, "Species")
 PS.TSS <- merge_phyloseq(PS.TSSE, PS.TSS1)
 
-fPS1 <- subset_taxa(fPS, !Genus%in%"g__Eimeria")
-fPSE <- subset_taxa(fPS, Genus%in%"g__Eimeria")
+fPS1 <- subset_taxa(fPS, !Genus%in%"Eimeria")
+fPSE <- subset_taxa(fPS, Genus%in%"Eimeria")
 fPSE <- tax_glom(fPSE, "Species")
 fPS <- merge_phyloseq(fPSE, fPS1)
 
-# and remove those handlers.
-#maybe move this up, before transforming so that we don't need to do this 3 x
-tax_table(PS.T)[, colnames(tax_table(PS.T))] <- gsub(tax_table(PS.T)[, colnames(tax_table(PS.T))], pattern="[a-z]__", replacement="")
-
-tax_table(PS.TSS)[, colnames(tax_table(PS.TSS))] <- gsub(tax_table(PS.TSS)[, colnames(tax_table(PS.TSS))], pattern="[a-z]__", replacement="")
-
-tax_table(fPS)[, colnames(tax_table(fPS))] <- gsub(tax_table(fPS)[, colnames(tax_table(fPS))], pattern="[a-z]__", replacement="")
-
-
-#### next step: do correlation analysis for each genus, to aglomerate highly correlated ASVs from the same genus --> likely same species
-
-# 174 genus, 174 networks
-
+#################### KTU approach
 get_taxa_unique(PS.T, "Genus")
+
+
