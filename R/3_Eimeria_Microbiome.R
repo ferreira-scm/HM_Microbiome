@@ -1,21 +1,9 @@
+
 source("R/2_Parasite_cleaning.R")
 
 library(vegan)
 
 # betadiversity (BC distances), permanova and visualisatio with MDS
-
-
-
-#hybridicity
-PS.T@sam_data$hi <- abs(PS.T@sam_data$HI-0.5)
-
-# subsetting dataset to not have NA's in permanova
-sdata <- sample_data(PS.T)
-sdata <- sdata[!is.na(sdata$hi),]
-sdata <- sdata[!is.na(sdata$BMI),]
-PS.T_sub <- subset_samples(PS.T, sample_names(PS.T)%in%rownames(sdata))
-PS.T_sub
-
 dist <- phyloseq::distance(PS.T_sub, method="bray", type="samples")
 
 permaPS <- adonis2(dist~
@@ -27,11 +15,24 @@ permaPS <- adonis2(dist~
 
 permaPS
 
+Parasite_sub <- subset_taxa(PS.T_sub, Genus %in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas"))
+
+Parasite_sub <- phyloseq::prune_samples(sample_sums(Parasite_sub)>0, Parasite_sub)
+
+dist_para <- phyloseq::distance(Parasite_sub, method="bray", type="samples")
+
+sdata_p <- sample_data(Parasite_sub)
+
+permaPara <- adonis2(dist_para~
+                   sdata_p$Sex+
+                   sdata_p$hi+
+                   sdata_p$BMI+
+                   sdata_p$Year+
+                   sdata_p$Locality)
+
+permaPara
+
 #### Now I want to know the effect of parasites on the eukaryotic and bacterial communities
-
-
-PS.T_minusP <- subset_taxa(PS.T_sub, !Genus %in%c("Eimeria", "Cryptosporidium", "Oxyurida", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis"))
-
 rank_names(PS.T)
 
 get_taxa_unique(PS.T, "Kingdom")
@@ -54,6 +55,8 @@ permaBac <- adonis2(dist_bac~
                         sdata_b$Eimeria_falciformis_asv+
                         sdata_b$Eimeria_vermiformis_asv+
                         sdata_b$Tritrichomonas_asv+
+                        sdata_b$Syphacia_asv+
+                        sdata_b$Aspiculuris_asv+
                         sdata_b$Trichuris_asv+
                         sdata_b$Hymenolepis_asv+
                         sdata_b$Ascaridida_asv+
@@ -70,6 +73,8 @@ permaBac
 permaEuk <- adonis2(dist_euk~
                         sdata_e$Eimeria_ferrisi_asv+
                         sdata_e$Eimeria_falciformis_asv+
+                        sdata_b$Syphacia_asv+
+                        sdata_b$Aspiculuris_asv+
                         sdata_e$Eimeria_vermiformis_asv+
                         sdata_e$Tritrichomonas_asv+
                         sdata_e$Trichuris_asv+
@@ -84,6 +89,103 @@ permaEuk <- adonis2(dist_euk~
                         sdata_e$Locality)
 
 permaEuk
+
+permaPS_para <- adonis2(dist~
+                   sdata$Sex+
+                   sdata$hi+
+                   sdata$BMI+
+                   sdata$Year+
+                   sdata$Locality+
+                        sdata$Eimeria_ferrisi_asv+
+                        sdata$Eimeria_falciformis_asv+
+                        sdata$Eimeria_vermiformis_asv+
+                        sdata$Tritrichomonas_asv+
+                        sdata$Syphacia_asv+
+                        sdata$Aspiculuris_asv+
+                        sdata$Trichuris_asv+
+                        sdata$Hymenolepis_asv+
+                        sdata$Ascaridida_asv+
+                        sdata$Crypto_asv+
+                        sdata$Mastophorus_asv)
+permaPS_para
+
+PS.ord <- ordinate(PS.T, "MDS", "bray")
+
+p1=plot_ordination(PS.T, PS.ord, type="sample", color="Co_infb")
+
+p1+theme_bw()+stat_ellipse(aes(group=PS.T@sam_data$Co_infb))
+
+
+PS.df <- as(sample_data(PS.T), "data.frame")
+
+groups <- PS.df$Co_infb
+
+library(vegan)
+
+PS.dis <- phyloseq::distance(PS.T@otu_table, "bray")
+
+mod <- betadisper(PS.dis, groups)
+
+anova(mod) # the dispersion is different between groups, then examine
+
+plot(mod)
+boxplot(mod)
+
+mod.HSD <- TukeyHSD(mod )
+plot(mod.HSD)
+
+co_adonis <- adonis2(PS.dis~Co_infb, data=PS.df)
+
+co_adonis
+
+permaPS_T <- adonis2(dist~
+                   sdata$Co_infb+
+                   sdata$Sex+
+                   sdata$hi+
+                   sdata$BMI+
+                   sdata$Year+
+                   sdata$Locality)
+
+permaPS_T
+
+##### ok, now let's see if co-infection classification is associated with microbiome
+permaPS_C <- adonis2(dist~
+                   sdata$Co_type+
+                   sdata$Sex+
+                   sdata$hi+
+                   sdata$BMI+
+                   sdata$Year+
+                   sdata$Locality)
+
+permaPS_C
+
+PS.ord_C <- ordinate(PS.T, "MDS", "bray")
+
+p2=plot_ordination(PS.T, PS.ord_C, type="sample", color="Co_type")
+p2+theme_bw()+stat_ellipse(aes(group=PS.T@sam_data$Co_type))
+
+PS.df <- as(sample_data(PS.T), "data.frame")
+
+Co_type <- PS.df$Co_type
+
+library(vegan)
+PS.dis <- phyloseq::distance(PS.T@otu_table, "bray")
+
+mod_type <- betadisper(PS.dis, Co_type)
+
+anova(mod_type) # the dispersion is different between groups, then examine
+
+plot(mod_type)
+
+boxplot(mod_type)
+
+mod.HSD_type <- TukeyHSD(mod_type)
+plot(mod.HSD_type)
+
+
+### alpha diversity next
+
+get_taxa_unique(Parasite, "Genus")
 
 ## richness, gotta get the untrimmed!!
 erich = estimate_richness(Euk_minusP)

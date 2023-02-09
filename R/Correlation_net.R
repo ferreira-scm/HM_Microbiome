@@ -115,7 +115,7 @@ E(net.grph)$weight <- abs(E(net.grph)$weight)
 
 set.seed(1234)
 plot(net.grph,
-     vertex.label=amp,
+     vertex.label=Oxy@tax_table[,7],
      edge.width=E(net.grph)$weight*4,
      vertex.color=adjustcolor(mc, 0.8),
      frame.col="grey")

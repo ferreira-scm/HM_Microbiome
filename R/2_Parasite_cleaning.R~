@@ -1,64 +1,8 @@
 
 source("R/1_filtering.R")
 
-# creating one phyloseq object for each parasite genus and Eimeria spp.
-Eim <- 
-EimFer <- 
-EimFal <- 
-EimVer <- 
+source("R/Correlation_net.R")
 
-Oxy <- subset_taxa(PS.T, Genus %in%"Oxyurida")
-Asca <- 
-Spiru <- subset_taxa(PS.T, Genus %in%"Spirurida")
-Tritri <- subset_taxa(PS.T, Genus %in%"Tritrichomonas")
-Tricho <- subset_taxa(PS.T, Genus %in%"Trichocephalida")
-Cyclo <- subset_taxa(PS.T, Genus%in%"Cyclophyllidea")
-
-#subset_taxa(PS.T, Genus %in%"Tetratrichomonas")
-
-sample_data(PS.T)$Eimeria_asv <- sample_sums(subset_taxa(PS.T, Genus %in%"Eimeria"))
-
-sample_data(PS.T)$ferrisi_asv <- sample_sums(subset_taxa(PS.T, Species %in%"ferrisi"))
-sample_data(PS.T)$falciformis_asv <- sample_sums(subset_taxa(PS.T, Species %in%"falciformis"))
-sample_data(PS.T)$vermiformis_asv <- sample_sums(subset_taxa(PS.T, Species %in%"vermiformis"))
-
-sample_data(PS.T)$Cripto_asv <- sample_sums(Cripto)
-sample_data(PS.T)$Oxy_asv <- sample_sums(Oxy)
-sample_data(PS.T)$Asca_asv <- sample_sums(Asca)
-sample_data(PS.T)$Spiru_asv <- sample_sums(Spiru)
-sample_data(PS.T)$Tritri_asv <- sample_sums(Tritri)
-sample_data(PS.T)$Tricho_asv <- sample_sums(Tricho)
-sample_data(PS.T)$Cyclo_asv <- sample_sums(Cyclo)
-
-mytb <- sample_data(PS.T)
-
-names(mytb)
-
-cor.test(log(1+mytb$Trichuris_muris), log(1+mytb$Tricho_asv))
-
-cor.test(log(1+mytb$Cyclo_asv), log(1+mytb$Catenotaenia_pusilla))
-
-cor.test(log(1+mytb$Cyclo_asv), log(1+mytb$Hymenolepis_sp))
-
-cor.test(log(1+mytb$Pinworms), log(1+mytb$Oxy_asv))
-
-cor.test(log(1+mytb$Spiru_asv), log(1+mytb$Mastophorus_muris))
-
-plot(log(1+mytb$Heligmosomoides_polygurus), log(1+mytb$Rhab_asv)) # nope!
-
-plot(log(1+mytb$Cyclo_asv), log(1+mytb$Catenotaenia_pusilla))
-
-plot(log(1+mytb$Cyclo_asv), log(1+mytb$Hymenolepis_sp))
-
-plot(log(1+mytb$Trichuris_muris), log(1+mytb$Tricho_asv))
-
-plot(log(1+mytb$Pinworms), log(1+mytb$Oxy_asv))
-
-plot(log(1+mytb$Aspiculuris_sp), log(1+mytb$Oxy_asv))
-
-plot(log(1+mytb$Syphacia_sp), log(1+mytb$Oxy_asv))
-
-plot(log(1+mytb$Spiru_asv), log(1+mytb$Mastophorus_muris))
 
 ############# We need to distinguis between Oxyurida ASVs
 ## create reference sequences for Syhacia and Apiculuris and align them to ASV
@@ -68,20 +12,25 @@ library(ShortRead)
 library(dada2)
 library(dplyr)
 
+
+Oxy <- subset_taxa(PS.T, Genus%in%"Oxyurida")
+
 seqs <- DNAStringSet(getSequences(colnames(Oxy@otu_table)))
+
+parasite <- "Oxyurida"
+amp <- 
+
+names(seqs) <- amp_func(PS.lT, parasite="Oxyurida")
+
 seqs18 <- seqs[-grep("D3A_", names(seqs))]
 seqs28 <- seqs[grep("D3A_", names(seqs))]
 
-parasite="Oxyurida"
-amp <- amp_func(PS.lT, parasite="Oxyurida")
-
-names(seqs) <- amp
 writeFasta(seqs, "tmp/Oxyurida.fa")
 
 ## get 18S sequences from Aspiculuris, Syphacia and...
-access.aspi18 <- c("EF464551.1", "MH215350.1", "KP338606.1", "KY462827.1", "MT755640.1", "KY462828.1", "MT613322.1", "KT764937.1")
+access.aspi18 <- c("EF464551.1", "MH215350.1", "KP338606.1", "KY462827.1", "MT755640.1", "KY462828.1", "MT613322.1")
 
-access.syph18 <- c("EF464553.1", "EF464554.1", "AB629697.1", "KY462829.1", "KY462826.1","OK138900.1", "OK138907.1", "OK138885.1", "OK138886.1", "OK138897.1", "OK138899.1", "OK138904.1", "OK138908.1","EU263105.2", "MT135057.1", "MT135058.1", "KT900946.1")
+access.syph18 <- c("EF464553.1", "EF464554.1", "AB629697.1", "KY462829.1", "KY462826.1","OK138900.1", "OK138907.1", "OK138885.1", "OK138886.1", "OK138897.1", "OK138899.1", "OK138904.1", "OK138908.1","EU263105.2", "MT135057.1", "MT135058.1")
 
 # retrieve sequences from NBCI and convert formats and label
 aspi18.db <- read.GenBank(access.aspi18)
@@ -106,7 +55,6 @@ names(outg.db) <- outg.ID
 #~/iqtree-2.2.0-Linux/bin/iqtree2 -s tmp/Oxyurida_tree/oxyurida18S.fa -m MFP -B 5000 -T AUTO
 
 # now the correlation networks
-source("R/Correlation_net.R")
 
 ######## Now we do a correlation network to see the likelihood of ASV within the same genus being from the same species.
 # Oxyurida
@@ -178,6 +126,9 @@ cor.test(log(1+sample_data(PS.T)$Hymenolepis_asv), log(1+sample_data(PS.T)$Hymen
 plot(log(1+sample_data(PS.T)$Hymenolepis_asv), log(1+sample_data(PS.T)$Hymenolepis_sp))
                                                        
 ### Now parasite community
-Parasite <- subset_taxa(PS.T, Genus %in%c("Eimeria", "Cryptosporidium", "Syphachia", "Aspiculuris", Ascaridida, "Mastophorus","Trichuris", "Hymenolepis"))
+Parasite <- subset_taxa(PS.T, Genus %in%c("Eimeria", "Cryptosporidium", "Syphachia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis"))
+
+
+Parasite
 
 
