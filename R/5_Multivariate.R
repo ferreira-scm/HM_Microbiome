@@ -37,7 +37,11 @@ plot(Mod1)
 
 table <- anova(Mod1, p.uni = "adjusted")
 
+which(table$uni.p<0.05)
 
+table
+
+saveRDS(table, "tmp/Mvabund_anovaPS10.R")
 
 #table2 <- anova.manyglm(Mod1, p.uni = "adjusted", show.time="all")
 

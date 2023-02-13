@@ -1,8 +1,6 @@
-
 source("R/1_filtering.R")
 
 source("R/Correlation_net.R")
-
 
 ############# We need to distinguis between Oxyurida ASVs
 ## create reference sequences for Syhacia and Apiculuris and align them to ASV
@@ -11,7 +9,6 @@ library(phangorn)
 library(ShortRead)
 library(dada2)
 library(dplyr)
-
 
 Oxy <- subset_taxa(PS.T, Genus%in%"Oxyurida")
 
@@ -79,13 +76,14 @@ ampdf
 
 PS.T@tax_table[which(PS.T@tax_table[,6]=="Oxyurida"),7] <- ampdf$species
 fPS@tax_table[which(fPS@tax_table[,6]=="Oxyurida"),7] <- ampdf$species
+PS.TSS@tax_table[which(PS.TSS@tax_table[,6]=="Oxyurida"),7] <- ampdf$species
 
 # now the correlation networks
 
 ######## Now we do a correlation network to see the likelihood of ASV within the same genus being from the same species.
 # Oxyurida
-parasite <- "Oxyurida"
-Correlation_net(PS.lT, PS.l, PS.T, "Oxyurida") # several species
+#parasite <- "Oxyurida"
+#Correlation_net(PS.lT, PS.l, PS.T, "Oxyurida") # several species
 
 PS.T@tax_table[which(PS.T@tax_table[,7]=="28S"),7]<- "Aspiculuris"
 PS.T@tax_table[which(PS.T@tax_table[,7]=="Aspiculuris"),6]<- "Aspiculuris"
@@ -96,63 +94,62 @@ PS.T <- merge_taxa(PS.T, taxa_names(PS.T)[which(PS.T@tax_table[,6]=="Aspiculuris
 sample_data(PS.T)$Syphacia_asv <- sample_sums(subset_taxa(PS.T, Genus %in%"Syphacia"))
 sample_data(PS.T)$Aspiculuris_asv <- sample_sums(subset_taxa(PS.T, Genus %in%"Aspiculuris"))
 
-cor.test(log(1+sample_data(PS.T)$Aspiculuris_asv), log(1+sample_data(PS.T)$Aspiculuris_sp))
-cor.test(log(1+sample_data(PS.T)$Syphacia_asv), log(1+sample_data(PS.T)$Syphacia_sp))
+#cor.test(log(1+sample_data(PS.T)$Aspiculuris_asv), log(1+sample_data(PS.T)$Aspiculuris_sp))
+#cor.test(log(1+sample_data(PS.T)$Syphacia_asv), log(1+sample_data(PS.T)$Syphacia_sp))
 
 # Tritrichomonas
-parasite <- "Tritrichomonas"
-Correlation_net(PS.lT, PS.l, PS.T, "Tritrichomonas")# likely 1 species: merge
+#parasite <- "Tritrichomonas"
+#Correlation_net(PS.lT, PS.l, PS.T, "Tritrichomonas")# likely 1 species: merge
 
 PS.T <- merge_taxa(PS.T, taxa_names(PS.T)[which(PS.T@tax_table[,6]=="Tritrichomonas")])
 PS.T@tax_table[which(PS.T@tax_table[,6]=="Tritrichomonas"),7] <- "Tritrichomonas_sp"
 sample_data(PS.T)$Tritrichomonas_asv <- sample_sums(subset_taxa(PS.T, Genus %in%"Tritrichomonas"))
 
 # Cryptosporidum
-parasite <- "Cryptosporidium"
-Correlation_net(PS.lT, PS.l, PS.T, "Cryptosporidium")# too sparce but likely 1 sp, merge?
+#parasite <- "Cryptosporidium"
+#Correlation_net(PS.lT, PS.l, PS.T, "Cryptosporidium")# too sparce but likely 1 sp, merge?
 
 PS.T <- merge_taxa(PS.T, taxa_names(PS.T)[which(PS.T@tax_table[,6]=="Cryptosporidium")])
 sample_data(PS.T)$Crypto_asv <- sample_sums(subset_taxa(PS.T, Genus %in%"Cryptosporidium"))
 
-
 #Ascaridida # heterakis?
-parasite <- "Ascaridida"
-Correlation_net(PS.lT, PS.l, PS.T, "Ascaridida")# likely 1 sp, merge
+#parasite <- "Ascaridida"
+#Correlation_net(PS.lT, PS.l, PS.T, "Ascaridida")# likely 1 sp, merge
 
 PS.T <- merge_taxa(PS.T, taxa_names(PS.T)[which(PS.T@tax_table[,6]=="Ascaridida")])
 PS.T@tax_table[which(PS.T@tax_table[,6]=="Ascaridida"),7] <- "Ascaridida"
 sample_data(PS.T)$Ascaridida_asv <- sample_sums(subset_taxa(PS.T, Genus %in%"Ascaridida"))
 
-cor.test(log(1+sample_data(PS.T)$Ascaridida_asv), log(1+sample_data(PS.T)$Heterakis))
+#cor.test(log(1+sample_data(PS.T)$Ascaridida_asv), log(1+sample_data(PS.T)$Heterakis))
 #plot(log(1+sample_data(PS.T)$Ascaridida_asv), log(1+sample_data(PS.T)$Heterakis))
 
 # Spirurida, likely Mastophorus (high correlation with worm counts)
-parasite <- "Spirurida"
-Correlation_net(PS.lT, PS.l, PS.T, "Spirurida")# too sparce, likely 1 sp, merge?
+#parasite <- "Spirurida"
+#Correlation_net(PS.lT, PS.l, PS.T, "Spirurida")# too sparce, likely 1 sp, merge?
 
 PS.T <- merge_taxa(PS.T, taxa_names(PS.T)[which(PS.T@tax_table[,6]=="Spirurida")])
 PS.T@tax_table[which(PS.T@tax_table[,6]=="Spirurida"),7] <- "Mastophorus_muris"
 PS.T@tax_table[which(PS.T@tax_table[,6]=="Spirurida"),6] <- "Mastophorus"
 sample_data(PS.T)$Mastophorus_asv <- sample_sums(subset_taxa(PS.T, Genus %in%"Mastophorus"))
 
-cor.test(log(1+sample_data(PS.T)$Mastophorus_asv), log(1+sample_data(PS.T)$Mastophorus_muris))
+#cor.test(log(1+sample_data(PS.T)$Mastophorus_asv), log(1+sample_data(PS.T)$Mastophorus_muris))
 #plot(sample_data(PS.T)$Mastophorus_asv, sample_data(PS.T)$Mastophorus_muris)
 
 #Trichocephalida, likely Trichuris muris
-parasite <- "Trichocephalida"
-Correlation_net(PS.lT, PS.l, PS.T, "Trichocephalida")# 1 species, merge
+#parasite <- "Trichocephalida"
+#Correlation_net(PS.lT, PS.l, PS.T, "Trichocephalida")# 1 species, merge
 
 PS.T <- merge_taxa(PS.T, taxa_names(PS.T)[which(PS.T@tax_table[,6]=="Trichocephalida")])
 PS.T@tax_table[which(PS.T@tax_table[,6]=="Trichocephalida"),7] <- "Trichuris_muri"
 PS.T@tax_table[which(PS.T@tax_table[,6]=="Trichocephalida"),6] <- "Trichuris"
 sample_data(PS.T)$Trichuris_asv <- sample_sums(subset_taxa(PS.T, Genus %in%"Trichuris"))
 
-cor.test(log(1+sample_data(PS.T)$Trichuris_asv), log(1+sample_data(PS.T)$Trichuris_muri))
+#cor.test(log(1+sample_data(PS.T)$Trichuris_asv), log(1+sample_data(PS.T)$Trichuris_muri))
 #plot(log(1+sample_data(PS.T)$Trichuris_asv), log(1+sample_data(PS.T)$Trichuris_muri))
 
 # Cyclophyllidae, likely Hymenolepis, not Catenotaenia_pusilla, nor Taenia
-parasite <- "Cyclophyllidea"
-Correlation_net(PS.lT, PS.l, PS.T, "Cyclophyllidea")# 1 species, merge
+#parasite <- "Cyclophyllidea"
+#Correlation_net(PS.lT, PS.l, PS.T, "Cyclophyllidea")# 1 species, merge
 
 PS.T <- merge_taxa(PS.T, taxa_names(PS.T)[which(PS.T@tax_table[,6]=="Cyclophyllidea")])
 PS.T@tax_table[which(PS.T@tax_table[,6]=="Cyclophyllidea"),7] <- "Hymenolepis_sp"
@@ -160,7 +157,7 @@ PS.T@tax_table[which(PS.T@tax_table[,6]=="Cyclophyllidea"),6] <- "Hymenolepis"
 
 sample_data(PS.T)$Hymenolepis_asv <- sample_sums(subset_taxa(PS.T, Genus %in%"Hymenolepis"))
 
-cor.test(log(1+sample_data(PS.T)$Hymenolepis_asv), log(1+sample_data(PS.T)$Hymenolepis_sp))
+#cor.test(log(1+sample_data(PS.T)$Hymenolepis_asv), log(1+sample_data(PS.T)$Hymenolepis_sp))
 #plot(log(1+sample_data(PS.T)$Hymenolepis_asv), log(1+sample_data(PS.T)$Hymenolepis_sp))
 
 # adding eimeria intensity to sample data
@@ -171,7 +168,6 @@ sample_data(PS.T)$Eimeria_vermiformis_asv <- sample_sums(subset_taxa(PS.T, Speci
 
 
 ## for fPS
-
 fPS@tax_table[which(fPS@tax_table[,7]=="28S"),7]<- "Aspiculuris"
 fPS@tax_table[which(fPS@tax_table[,7]=="Aspiculuris"),6]<- "Aspiculuris"
 fPS@tax_table[which(fPS@tax_table[,7]=="Syphacia"),6]<- "Syphacia"
@@ -216,10 +212,51 @@ sample_data(fPS)$Eimeria_ferrisi_asv <- sample_sums(subset_taxa(fPS, Species %in
 sample_data(fPS)$Eimeria_falciformis_asv <- sample_sums(subset_taxa(fPS, Species %in%"falciformis"))
 sample_data(fPS)$Eimeria_vermiformis_asv <- sample_sums(subset_taxa(fPS, Species %in%"vermiformis"))
 
+### for PS.TSS, sorry I know I should make a function for this, but I am lazy
 
+PS.TSS@tax_table[which(PS.TSS@tax_table[,7]=="28S"),7]<- "Aspiculuris"
+PS.TSS@tax_table[which(PS.TSS@tax_table[,7]=="Aspiculuris"),6]<- "Aspiculuris"
+PS.TSS@tax_table[which(PS.TSS@tax_table[,7]=="Syphacia"),6]<- "Syphacia"
 
-fPS
-PS.T
+PS.TSS <- merge_taxa(PS.TSS, taxa_names(PS.TSS)[which(PS.TSS@tax_table[,6]=="Syphacia")])
+PS.TSS <- merge_taxa(PS.TSS, taxa_names(PS.TSS)[which(PS.TSS@tax_table[,6]=="Aspiculuris")])
+
+sample_data(PS.TSS)$Syphacia_asv <- sample_sums(subset_taxa(PS.TSS, Genus %in%"Syphacia"))
+sample_data(PS.TSS)$Aspiculuris_asv <- sample_sums(subset_taxa(PS.TSS, Genus %in%"Aspiculuris"))
+
+PS.TSS <- merge_taxa(PS.TSS, taxa_names(PS.TSS)[which(PS.TSS@tax_table[,6]=="Tritrichomonas")])
+PS.TSS@tax_table[which(PS.TSS@tax_table[,6]=="Tritrichomonas"),7] <- "Tritrichomonas_sp"
+sample_data(PS.TSS)$Tritrichomonas_asv <- sample_sums(subset_taxa(PS.TSS, Genus %in%"Tritrichomonas"))
+
+PS.TSS <- merge_taxa(PS.TSS, taxa_names(PS.TSS)[which(PS.TSS@tax_table[,6]=="Cryptosporidium")])
+sample_data(PS.TSS)$Crypto_asv <- sample_sums(subset_taxa(PS.TSS, Genus %in%"Cryptosporidium"))
+
+PS.TSS <- merge_taxa(PS.TSS, taxa_names(PS.TSS)[which(PS.TSS@tax_table[,6]=="Ascaridida")])
+PS.TSS@tax_table[which(PS.TSS@tax_table[,6]=="Ascaridida"),7] <- "Ascaridida"
+sample_data(PS.TSS)$Ascaridida_asv <- sample_sums(subset_taxa(PS.TSS, Genus %in%"Ascaridida"))
+
+PS.TSS <- merge_taxa(PS.TSS, taxa_names(PS.TSS)[which(PS.TSS@tax_table[,6]=="Spirurida")])
+PS.TSS@tax_table[which(PS.TSS@tax_table[,6]=="Spirurida"),7] <- "Mastophorus_muris"
+PS.TSS@tax_table[which(PS.TSS@tax_table[,6]=="Spirurida"),6] <- "Mastophorus"
+sample_data(PS.TSS)$Mastophorus_asv <- sample_sums(subset_taxa(PS.TSS, Genus %in%"Mastophorus"))
+
+PS.TSS <- merge_taxa(PS.TSS, taxa_names(PS.TSS)[which(PS.TSS@tax_table[,6]=="Trichocephalida")])
+PS.TSS@tax_table[which(PS.TSS@tax_table[,6]=="Trichocephalida"),7] <- "Trichuris_muri"
+PS.TSS@tax_table[which(PS.TSS@tax_table[,6]=="Trichocephalida"),6] <- "Trichuris"
+
+sample_data(PS.TSS)$Trichuris_asv <- sample_sums(subset_taxa(PS.TSS, Genus %in%"Trichuris"))
+
+PS.TSS <- merge_taxa(PS.TSS, taxa_names(PS.TSS)[which(PS.TSS@tax_table[,6]=="Cyclophyllidea")])
+PS.TSS@tax_table[which(PS.TSS@tax_table[,6]=="Cyclophyllidea"),7] <- "Hymenolepis_sp"
+PS.TSS@tax_table[which(PS.TSS@tax_table[,6]=="Cyclophyllidea"),6] <- "Hymenolepis"
+
+sample_data(PS.TSS)$Hymenolepis_asv <- sample_sums(subset_taxa(PS.TSS, Genus %in%"Hymenolepis"))
+
+# adding eimeria intensity to sample data
+sample_data(PS.TSS)$Eimeria_asv <- sample_sums(subset_taxa(PS.TSS, Genus %in%"Eimeria"))
+sample_data(PS.TSS)$Eimeria_ferrisi_asv <- sample_sums(subset_taxa(PS.TSS, Species %in%"ferrisi"))
+sample_data(PS.TSS)$Eimeria_falciformis_asv <- sample_sums(subset_taxa(PS.TSS, Species %in%"falciformis"))
+sample_data(PS.TSS)$Eimeria_vermiformis_asv <- sample_sums(subset_taxa(PS.TSS, Species %in%"vermiformis"))
 
 
 
@@ -338,5 +375,21 @@ PS.T_sub
 
 PS.T_minusP <- subset_taxa(PS.T_sub, !Genus %in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas"))
 
+fPS@sam_data$Co_type <- PS.T@sam_data$Co_type
+
+fPS@sam_data$Co_inf <- PS.T@sam_data$Co_inf
+
+fPS@sam_data$Co_infb <- PS.T@sam_data$Co_infb
+
+PS.TSS@sam_data$Co_type <- PS.T@sam_data$Co_type
+
+PS.TSS@sam_data$Co_inf <- PS.T@sam_data$Co_inf
+
+PS.TSS@sam_data$Co_infb <- PS.T@sam_data$Co_infb
 
 
+PS.T
+
+PS.TSS
+
+fPS

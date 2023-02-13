@@ -90,6 +90,9 @@ permaEuk <- adonis2(dist_euk~
 
 permaEuk
 
+
+## let's just combine and analysi gut community instead for separate domains
+# parasites explain ~ 7%
 permaPS_para <- adonis2(dist~
                    sdata$Sex+
                    sdata$hi+
@@ -126,9 +129,12 @@ PS.dis <- phyloseq::distance(PS.T@otu_table, "bray")
 
 mod <- betadisper(PS.dis, groups)
 
+
+
 anova(mod) # the dispersion is different between groups, then examine
 
-plot(mod)
+plot(mod, hull=FALSE, ellipse=TRUE)
+
 boxplot(mod)
 
 mod.HSD <- TukeyHSD(mod )

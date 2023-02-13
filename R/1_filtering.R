@@ -138,7 +138,33 @@ fPSE <- subset_taxa(fPS, Genus%in%"Eimeria")
 fPSE <- tax_glom(fPSE, "Species")
 fPS <- merge_phyloseq(fPSE, fPS1)
 
-#################### KTU approach
-get_taxa_unique(PS.T, "Genus")
+#### let's adjust the metadata too, to include Fay's immune genes that have been inputed
 
+Immune <- read.csv("https://raw.githubusercontent.com/fayweb/Eimeria_mouse_immunity/main/output_data/2.imputed_MICE_data_set.csv")
+
+names(Immune)
+
+#subsetting to filed animals only
+Immune <- Immune[Immune$origin=="Field",]
+
+                                        # keeping wanted variables only
+head(Immune)
+
+keep <- c("Mouse_ID","IFNy", "CXCR3", "IL.6", "IL.13", "IL1RN", "CASP1", "CXCL9", "IDO1", "IRGM1", "MPO", "MUC2", "MUC5AC", "MYD88", "NCR1", "PRF1", "RETNLB", "SOCS1", "TICAM1", "TNF")
+
+Nkeep <- c("IFNy", "CXCR3", "IL.6", "IL.13", "IL1RN", "CASP1", "CXCL9", "IDO1", "IRGM1", "MPO", "MUC2", "MUC5AC", "MYD88", "NCR1", "PRF1", "RETNLB", "SOCS1", "TICAM1", "TNF")
+
+
+Immune <- Immune[,keep]
+
+head(Immune)
+# fixing name structure
+Immune$Mouse_ID <- gsub("AA", "AA_", Immune$Mouse_ID)
+# removing samples that are not in our PS
+Immune <- Immune[which(Immune$Mouse_ID%in%PS.T@sam_data$Mouse_ID),]
+# sanity checj
+Immune[match(PS.T@sam_data$Mouse_ID, Immune$Mouse_ID),"Mouse_ID"]==PS.T@sam_data$Mouse_ID
+#and replace
+PS.T@sam_data[,Nkeep] <- Immune[match(PS.T@sam_data$Mouse_ID, Immune$Mouse_ID),Nkeep]
+fPS@sam_data[,Nkeep] <- Immune[match(PS.T@sam_data$Mouse_ID, Immune$Mouse_ID),Nkeep]
 

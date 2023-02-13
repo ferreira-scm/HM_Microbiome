@@ -1,5 +1,8 @@
 source("R/2_Parasite_cleaning.R")
 
+### We shouldn't use spieceasi because of the internal transformations
+
+
 library(SpiecEasi)
 
 library(microbiome)
