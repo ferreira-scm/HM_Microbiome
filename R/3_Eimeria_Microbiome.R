@@ -1,227 +1,131 @@
-
-source("R/2_Parasite_cleaning.R")
-
+library(phyloseq)
 library(vegan)
+PS.T <- readRDS("tmp/PS.T.rds")
+sdata <- PS.T@sam_data
 
 # betadiversity (BC distances), permanova and visualisatio with MDS
-dist <- phyloseq::distance(PS.T_sub, method="bray", type="samples")
+dist_bray <- vegdist(PS.T@otu_table, method="bray")
 
-permaPS <- adonis2(dist~
-                   sdata$Sex+
-                   sdata$hi+
-                   sdata$BMI+
-                   sdata$Year+
-                   sdata$Locality)
+PS.mP <- subset_taxa(PS.T, !Genus %in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas"))
+dist_mP <- vegdist(PS.mP@otu_table, method="bray")
 
-permaPS
+Parasite <- subset_taxa(PS.T, Genus %in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas"))
+Parasite <- phyloseq::prune_samples(sample_sums(Parasite)>0, Parasite)
+dist_para <- phyloseq::distance(Parasite, method="bray", type="samples")
 
-Parasite_sub <- subset_taxa(PS.T_sub, Genus %in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas"))
-
-Parasite_sub <- phyloseq::prune_samples(sample_sums(Parasite_sub)>0, Parasite_sub)
-
-dist_para <- phyloseq::distance(Parasite_sub, method="bray", type="samples")
-
-sdata_p <- sample_data(Parasite_sub)
+sdata_p <- Parasite@sam_data
 
 permaPara <- adonis2(dist_para~
                    sdata_p$Sex+
                    sdata_p$hi+
                    sdata_p$BMI+
                    sdata_p$Year+
-                   sdata_p$Locality)
+#                   sdata_p$Co_infb+
+                   sdata_p$Locality,
+                   by="margin")
 
 permaPara
 
-#### Now I want to know the effect of parasites on the eukaryotic and bacterial communities
-rank_names(PS.T)
+## testing now the Anna Karenina principle: each dysbiotic community is dysbiotic on its own way
+PS.mP@sam_data$Co_infb <- as.factor(PS.mP@sam_data$Co_infb)
 
-get_taxa_unique(PS.T, "Kingdom")
+PS.ord <- ordinate(PS.mP, "MDS", "bray")
+p1=plot_ordination(PS.mP, PS.ord, type="sample", color="Co_infb")
 
-Bac <- subset_taxa(PS.T_minusP, Kingdom%in%c("Bacteria", "Archaea"))
-Bac <- phyloseq::prune_samples(sample_sums(Bac)>0, Bac)
-Euk_minusP <- subset_taxa(PS.T_minusP, !Kingdom%in%c("Bacteria", "Archaea", NA, "unidentified"))
-Euk_minusP <- phyloseq::prune_samples(sample_sums(Euk_minusP)>0, Euk_minusP)
-get_taxa_unique(Euk_minusP, "Kingdom")
+p1+
+    scale_color_manual(labels=c("uninfected", "single parasite", "multiple parasites"), values = c("wheat", "tomato", "tomato4"))+
+    labs(color="Parasite infection")+
+    theme_bw()+
+    stat_ellipse(aes(group=PS.mP@sam_data$Co_infb)) 
 
-dist_bac <- phyloseq::distance(Bac, method="bray", type="samples")
-
-dist_euk <- phyloseq::distance(Euk_minusP, method="bray", type="samples")
-
-sdata_b <- sample_data(Bac)
-sdata_e <- sample_data(Euk_minusP)
-
-permaBac <- adonis2(dist_bac~
-                        sdata_b$Eimeria_ferrisi_asv+
-                        sdata_b$Eimeria_falciformis_asv+
-                        sdata_b$Eimeria_vermiformis_asv+
-                        sdata_b$Tritrichomonas_asv+
-                        sdata_b$Syphacia_asv+
-                        sdata_b$Aspiculuris_asv+
-                        sdata_b$Trichuris_asv+
-                        sdata_b$Hymenolepis_asv+
-                        sdata_b$Ascaridida_asv+
-                        sdata_b$Crypto_asv+
-                        sdata_b$Mastophorus_asv+
-                        sdata_b$Sex+
-                        sdata_b$hi+
-                        sdata_b$Year+
-                        sdata_b$BMI+
-                        sdata_b$Locality)
-
-permaBac
-
-permaEuk <- adonis2(dist_euk~
-                        sdata_e$Eimeria_ferrisi_asv+
-                        sdata_e$Eimeria_falciformis_asv+
-                        sdata_b$Syphacia_asv+
-                        sdata_b$Aspiculuris_asv+
-                        sdata_e$Eimeria_vermiformis_asv+
-                        sdata_e$Tritrichomonas_asv+
-                        sdata_e$Trichuris_asv+
-                        sdata_e$Hymenolepis_asv+
-                        sdata_e$Ascaridida_asv+
-                        sdata_e$Crypto_asv+
-                        sdata_e$Mastophorus_asv+
-                        sdata_e$Sex+
-                        sdata_e$hi+
-                        sdata_e$Year+
-                        sdata_e$BMI+
-                        sdata_e$Locality)
-
-permaEuk
-
-
-## let's just combine and analysi gut community instead for separate domains
-# parasites explain ~ 7%
-permaPS_para <- adonis2(dist~
-                   sdata$Sex+
-                   sdata$hi+
-                   sdata$BMI+
-                   sdata$Year+
-                   sdata$Locality+
-                        sdata$Eimeria_ferrisi_asv+
-                        sdata$Eimeria_falciformis_asv+
-                        sdata$Eimeria_vermiformis_asv+
-                        sdata$Tritrichomonas_asv+
-                        sdata$Syphacia_asv+
-                        sdata$Aspiculuris_asv+
-                        sdata$Trichuris_asv+
-                        sdata$Hymenolepis_asv+
-                        sdata$Ascaridida_asv+
-                        sdata$Crypto_asv+
-                        sdata$Mastophorus_asv)
-permaPS_para
-
-PS.ord <- ordinate(PS.T, "MDS", "bray")
-
-p1=plot_ordination(PS.T, PS.ord, type="sample", color="Co_infb")
-
-p1+theme_bw()+stat_ellipse(aes(group=PS.T@sam_data$Co_infb))
-
-
-PS.df <- as(sample_data(PS.T), "data.frame")
+PS.df <- as(sample_data(PS.mP), "data.frame")
 
 groups <- PS.df$Co_infb
+#PS.dis <- phyloseq::distance(PS.T@otu_table, "bray")
+mod <- betadisper(dist_mP, groups)
 
-library(vegan)
-
-PS.dis <- phyloseq::distance(PS.T@otu_table, "bray")
-
-mod <- betadisper(PS.dis, groups)
-
-
-
-anova(mod) # the dispersion is different between groups, then examine
-
+anova(mod) # the dispersion is not different between groups
 plot(mod, hull=FALSE, ellipse=TRUE)
+boxplot(mod) # the dispersion is not different between groups
+mod.HSD <- TukeyHSD(mod)
+plot(mod.HSD)# the dispersion is not different between groups
 
-boxplot(mod)
+#### No evidence for stochastic effect between parasite infection, rather deterministic one
 
-mod.HSD <- TukeyHSD(mod )
-plot(mod.HSD)
+### alpha diversity next
+## richness, gotta get the untrimmed!!
+shannon <- vegan::diversity(PS.mP@otu_table, index = "shannon")   
+simpson <- vegan::diversity(PS.mP@otu_table, index="simpson")
 
-co_adonis <- adonis2(PS.dis~Co_infb, data=PS.df)
+PS.df$shannon <- shannon
+PS.df$simpson <- simpson
 
-co_adonis
+cor.test(as.numeric(PS.df$Co_inf), PS.df$shannon)# zero!
 
-permaPS_T <- adonis2(dist~
+shan_parasite <- ggplot(data=PS.df, aes(y=shannon, x=Co_infb, fill=Co_infb))+
+    geom_boxplot(alpha=0.5, outlier.shape = NA)+
+    scale_fill_brewer(palette="Dark2")+
+    geom_jitter(position=position_jitter(0.3), alpha=0.5)+
+    labs(x="Parasite infection", y="Shannon diversity index")+
+    scale_x_discrete(labels=c("uninfected", "single parasite", "multiple parasites"))+
+    theme_bw()+
+    theme(legend.position="none")
+
+ggplot2::ggsave(file="fig/Shannon_Parasite.pdf", shan_parasite, width = 6, height = 4, dpi = 600)
+
+summary(aov(shannon~Co_infb, PS.df))
+
+library(lme4)
+library(lmerTest)
+library(effects)
+
+df$Co_inf <- as.numeric(df$Co_inf)
+
+## testing the effect of parasites in shanon diversity
+
+############# This gets complicated, let's do it with BMRS
+shaModel <- lmer(shannon~BMI+
+                     Eimeria_ferrisi_asv+
+                     Eimeria_falciformis_asv+
+                     Eimeria_vermiformis_asv+
+                     Hymenolepis_asv+
+                     Trichuris_asv+
+                     Mastophorus_asv+
+                     Ascaridida_asv+
+                     Crypto_asv+
+                     Tritrichomonas_asv+
+                     Aspiculuris_asv+
+                     Syphacia_asv+
+                     hi+Sex+Year+(1|Locality), PS.df)
+
+summary(shaModel)
+
+plot(Effect("Tritrichomonas_asv", shaModel))
+
+0.00107+0.00260+0.00101+0.00129+0.00139+0.00131+0.00147+0.00143+0.00507+0.00257+0.00476+0.00491
+
+sdata$Co_infb <- as.factor(sdata$Co_infb)
+
+permaPS_T_para <- adonis2(dist_mP~
+                         sdata$Eimeria_ferrisi_asv+
+                         sdata$Eimeria_falciformis_asv+
+                         sdata$Eimeria_vermiformis_asv+
+                         sdata$Hymenolepis_asv+
+                         sdata$Trichuris_asv+
+                         sdata$Mastophorus_asv+
+                         sdata$Ascaridida_asv+
+                         sdata$Crypto_asv+
+                         sdata$Tritrichomonas_asv+
+                         sdata$Aspiculuris_asv+
+                         sdata$Syphacia_asv+
                    sdata$Co_infb+
                    sdata$Sex+
                    sdata$hi+
                    sdata$BMI+
                    sdata$Year+
-                   sdata$Locality)
-
-permaPS_T
-
-##### ok, now let's see if co-infection classification is associated with microbiome
-permaPS_C <- adonis2(dist~
-                   sdata$Co_type+
-                   sdata$Sex+
-                   sdata$hi+
-                   sdata$BMI+
-                   sdata$Year+
-                   sdata$Locality)
-
-permaPS_C
-
-PS.ord_C <- ordinate(PS.T, "MDS", "bray")
-
-p2=plot_ordination(PS.T, PS.ord_C, type="sample", color="Co_type")
-p2+theme_bw()+stat_ellipse(aes(group=PS.T@sam_data$Co_type))
-
-PS.df <- as(sample_data(PS.T), "data.frame")
-
-Co_type <- PS.df$Co_type
-
-library(vegan)
-PS.dis <- phyloseq::distance(PS.T@otu_table, "bray")
-
-mod_type <- betadisper(PS.dis, Co_type)
-
-anova(mod_type) # the dispersion is different between groups, then examine
-
-plot(mod_type)
-
-boxplot(mod_type)
-
-mod.HSD_type <- TukeyHSD(mod_type)
-plot(mod.HSD_type)
+                   sdata$Locality,
+                   by="margin")
 
 
-### alpha diversity next
+permaPS_T_para
 
-get_taxa_unique(Parasite, "Genus")
-
-## richness, gotta get the untrimmed!!
-erich = estimate_richness(Euk_minusP)
-
-brich = estimate_richness(Bac)
-
-plot_richness(Bac, measures="Shannon")
-
-test <- estimateR(round(Bac@otu_table*100))
-
-test
-
-erich
-
-Richdf <- data.frame(
-    brichChao=brich$Observed,
-    brichShan=brich$Shannon,
-    brichObs=brich$Chao1,
-    Year=sdata_b$Year,
-    HI=sdata_b$hi,
-    Sex=sdata_b$Sex,
-    BMI=sdata_b$BMI,
-    Locality=sdata_b$Locality,
-    Eim_fer=sdata_e$Eimeria_ferrisi_asv,
-    Eim_fal=sdata_e$Eimeria_falciformis_asv,
-    Eim_ver=sdata_e$Eimeria_vermiformis_asv,
-    Tritri=sdata_e$Tritrichomonas_asv,
-    Trichuris=sdata_e$Trichuris_asv,
-    Hymenolepis=sdata_e$Hymenolepis_asv,
-    Ascaridida=sdata_e$Ascaridida_asv,
-    Crypto=sdata_e$Crypto_asv,
-    Mastophorus=sdata_e$Mastophorus_asv)
-                        

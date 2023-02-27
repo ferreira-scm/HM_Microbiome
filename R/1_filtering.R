@@ -1,6 +1,20 @@
 library(ggplot2)
 library(reshape)
 library(microbiome)
+library(vegan)
+
+### this script does a quality filter (by amplicon) and then some transformations
+# TSS --> Total sum scaling (per amplicon) and then merges all amplicon datasets into 1 (PS.TSS)
+# T --> Total sum scaling multiplied by sample DNA concentration and then merges all amplicons
+# into 1 dataset (PS.T)
+# fPS is the filered dataset with no normalization
+
+# We also remove the silva handlers from the taxonomic table (all the "g__", "s__"...), so this
+#makes the script run slower than expected.
+
+# finally, we do a bit of cleaning up in the sampla data, by adding inputed immune genes from Fay
+# and by inputing the few missing values for BMI and HI
+
 
 #### preprocessing: filtering and transforming
 PS.l <- readRDS(file = "data/PhyloSeqList_HMHZ_All.Rds")
@@ -60,6 +74,7 @@ PS.T <- PS.lT[[1]]
 for (i in 2:length(PS.lT)){
     PS.T <- try(merge_phyloseq(PS.T,PS.lT[[i]]))
 }
+
 
 ############# now for lab dataset
 ## filtering MA by amplicon
@@ -121,6 +136,7 @@ rownames(PS.T@tax_table[eim_rn])== rownames(Eim@tax_table)
 PS.T@tax_table[eim_rn, 7] <- Eim@tax_table[,7]
 fPS@tax_table[eim_rn, 7] <- Eim@tax_table[,7]
 PS.TSS@tax_table[eim_rn, 7] <- Eim@tax_table[,7]
+PS.CLR@tax_table[eim_rn, 7] <- Eim@tax_table[,7]
 
 ## ok now we agglomerate Eimeria species
 PS.T1 <- subset_taxa(PS.T, !Genus%in%"Eimeria")
@@ -139,24 +155,13 @@ fPSE <- tax_glom(fPSE, "Species")
 fPS <- merge_phyloseq(fPSE, fPS1)
 
 #### let's adjust the metadata too, to include Fay's immune genes that have been inputed
-
 Immune <- read.csv("https://raw.githubusercontent.com/fayweb/Eimeria_mouse_immunity/main/output_data/2.imputed_MICE_data_set.csv")
-
-names(Immune)
-
 #subsetting to filed animals only
 Immune <- Immune[Immune$origin=="Field",]
-
-                                        # keeping wanted variables only
-head(Immune)
-
+# keeping wanted variables only
 keep <- c("Mouse_ID","IFNy", "CXCR3", "IL.6", "IL.13", "IL1RN", "CASP1", "CXCL9", "IDO1", "IRGM1", "MPO", "MUC2", "MUC5AC", "MYD88", "NCR1", "PRF1", "RETNLB", "SOCS1", "TICAM1", "TNF")
-
 Nkeep <- c("IFNy", "CXCR3", "IL.6", "IL.13", "IL1RN", "CASP1", "CXCL9", "IDO1", "IRGM1", "MPO", "MUC2", "MUC5AC", "MYD88", "NCR1", "PRF1", "RETNLB", "SOCS1", "TICAM1", "TNF")
-
-
 Immune <- Immune[,keep]
-
 head(Immune)
 # fixing name structure
 Immune$Mouse_ID <- gsub("AA", "AA_", Immune$Mouse_ID)
@@ -167,4 +172,19 @@ Immune[match(PS.T@sam_data$Mouse_ID, Immune$Mouse_ID),"Mouse_ID"]==PS.T@sam_data
 #and replace
 PS.T@sam_data[,Nkeep] <- Immune[match(PS.T@sam_data$Mouse_ID, Immune$Mouse_ID),Nkeep]
 fPS@sam_data[,Nkeep] <- Immune[match(PS.T@sam_data$Mouse_ID, Immune$Mouse_ID),Nkeep]
+PS.TSS@sam_data[,Nkeep] <- Immune[match(PS.T@sam_data$Mouse_ID, Immune$Mouse_ID),Nkeep]
+
+##### we are going to input that BMI value missing, and the HI values missing too.
+library(mice)
+df <- data.frame(PS.T@sam_data[,c("Mouse_ID", "HI", "BMI")])
+df.t <- mice(df, m=5, maxit=50, meth='pmm', seed=500)
+df.t <- complete(df.t,1)
+# sanity check
+all(PS.T@sam_data$Mouse_ID==df.t$Mouse_ID)
+PS.T@sam_data$BMI <- df.t$BMI
+PS.TSS@sam_data$BMI <- df.t$BMI
+fPS@sam_data$BMI <- df.t$BMI
+PS.T@sam_data$HI <- df.t$HI
+PS.TSS@sam_data$HI <- df.t$HI
+fPS@sam_data$HI <- df.t$HI
 
