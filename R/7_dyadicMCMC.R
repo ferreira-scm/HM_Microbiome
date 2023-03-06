@@ -10,6 +10,32 @@ library(ggmcmc)
 library(ggthemes)
 library(ggridges)
 library(vegan)
+library(phyloseq)
+library(ggplot2)
+library(bayesplot)
+library(bayestestR)
+library(brms)
+library(MCMCglmm)
+library(doParallel)
+library(parallel)
+library(magrittr)
+library(dplyr)
+library(purrr)
+library(forcats)
+library(tidyr)
+library(modelr)
+library(ggdist)
+library(tidybayes)
+library(ggplot2)
+library(cowplot)
+library(rstan)
+library(brms)
+library(ggrepel)
+library(RColorBrewer)
+library(gganimate)
+library(posterior)
+library(distributional)
+
 
 PS.T <- readRDS("tmp/PS.T.rds")
 
@@ -55,7 +81,10 @@ dimnames(SPATM)<- c(key, key)
 # 2) pairwise genetic distance based on genetic data
 # I actually need to get this from sota again
 sota <- read.csv("https://raw.githubusercontent.com/derele/Mouse_Eimeria_Field/master/data_products/SOTA_Data_Product.csv")
-sota <- sota[sota$Mouse_ID%in%distance.df$Mouse_ID,c(1,6:25)]
+gen <- c("mtBamH", "YNPAR", "X332", "X347", "X65", "Tsx", "Btk", "Syap1",
+         "Es1","Gpd1","Idh1","Mpi","Np", "Sod1", "Es1C", "Gpd1C", "Idh1C",
+         "MpiC","NpC", "Sod1C")
+sota <- sota[sota$Mouse_ID%in%distance.df$Mouse_ID,c("Mouse_ID", gen)]
 sota <- sota[match(distance.df$Mouse_ID, sota$Mouse_ID),]
 all(sota$Mouse_ID==distance.df$Mouse_ID)
 rownames(sota) <- sota$Mouse_ID
@@ -64,24 +93,24 @@ gen.dis <- dist.gene(sota, method = "pairwise", pairwise.deletion = TRUE)
 gen.dis <- as.matrix(gen.dis)
 dimnames(gen.dis) <- c(key, key)
 
-## 3) making Sex combination factor matrix
-Sex_frame<-metadt[,c("Mouse_ID","Sex")]
-Sex_frame$Mouse_ID<-as.character(Sex_frame$Mouse_ID)
-Sex_frame$Sex<-as.character(Sex_frame$Sex)
+## 3) No need for sex anymore
+#Sex_frame<-metadt[,c("Mouse_ID","Sex")]
+#Sex_frame$Mouse_ID<-as.character(Sex_frame$Mouse_ID)
+#Sex_frame$Sex<-as.character(Sex_frame$Sex)
 #Create an empty character matrix to fill with characters
-SEXM<-array(as.character(NA),c(nrow(Sex_frame),nrow(Sex_frame)))
-
-for(i in 1:nrow(Sex_frame)){
-    for(j in 1:nrow(Sex_frame)){
-        if(Sex_frame$Sex[i]=="F" & Sex_frame$Sex[i]==Sex_frame$Sex[j]){
-            SEXM[i,j]= "FF"}
-        if(Sex_frame$Sex[i]=="M" & Sex_frame$Sex[i]==Sex_frame$Sex[j]){
-            SEXM[i,j]= "MM"}
-        if( Sex_frame$Sex[i]!=Sex_frame$Sex[j]){
-            SEXM[i,j]= "FM"}
-    }
-}
-dimnames(SEXM)<-c(key, key)
+#SEXM<-array(as.character(NA),c(nrow(Sex_frame),nrow(Sex_frame)))
+#
+#for(i in 1:nrow(Sex_frame)){
+#    for(j in 1:nrow(Sex_frame)){
+#        if(Sex_frame$Sex[i]=="F" & Sex_frame$Sex[i]==Sex_frame$Sex[j]){
+#            SEXM[i,j]= "FF"}
+#        if(Sex_frame$Sex[i]=="M" & Sex_frame$Sex[i]==Sex_frame$Sex[j]){
+#           SEXM[i,j]= "MM"}
+#        if( Sex_frame$Sex[i]!=Sex_frame$Sex[j]){
+#            SEXM[i,j]= "FM"}
+#    }
+#}
+#dimnames(SEXM)<-c(key, key)
 
 # 4) Making BMI distances
 #Create data frame with each sample name (character) and sampling time (numeric)
@@ -146,7 +175,7 @@ str(BMIM)
 str(SPATM)
 str(JACM)
 str(gen.dis)
-str(SEXM)
+#str(SEXM)
 str(PARA)
 str(LocM)
 str(HIM)
@@ -159,13 +188,13 @@ jac<-c(as.dist(JACM))
 bmi<-c(as.dist(BMIM))
 spa<-c(as.dist(SPATM))
 gen<-c(as.dist(gen.dis))
-sex<-c(SEXM[lower.tri(SEXM)])
+#sex<-c(SEXM[lower.tri(SEXM)])
 para<-c(as.dist(PARA))
 loc <- c(as.dist(LocM))
 HIm <- c(as.dist(HIM))
          
 #Combine these vectors into a data frame
-data.dyad<-data.frame(Parasite=para, BMI=bmi,Microbiome_similarity=jac,spatial=spa,sex_combination=sex, genetic_dist=gen, locality=loc, HI=HIm)
+data.dyad<-data.frame(Parasite=para, BMI=bmi,Microbiome_similarity=jac,spatial=spa, genetic_dist=gen, locality=loc, HI=HIm)
 
 #Now all we need to do is add the identities of both individuals in each dyad as separate columns into the data frame and exclude self-comparisons (as these are not meaningful).
 
@@ -194,7 +223,7 @@ data.dyad<-data.dyad[which(data.dyad$IDA!=data.dyad$IDB),]
 ######################### Now we model the data ####################
 
 ## sex combination into a factor
-data.dyad$sex_combination <- factor(data.dyad$sex_combination, levels=c("MM", "FM", "FF"))
+#data.dyad$sex_combination <- factor(data.dyad$sex_combination, levels=c("MM", "FM", "FF"))
 
 #scale all predictors to range between 0-1 if they are not already naturally on that scale
 #define scaling function:
@@ -204,8 +233,7 @@ for(i in 1:ncol(data.dyad[,which(colnames(data.dyad)%in%scalecols)])){
     data.dyad[,which(colnames(data.dyad)%in%scalecols)][,i]<-range.use(data.dyad[,which(colnames(data.dyad)%in%scalecols)][,i],0,1)
     }
 
-library(ggplot2)
-hist(data.dyad$Microbiome_similarity)
+#hist(data.dyad$Microbiome_similarity)
 # proportional values semi-normally distributed limited between 0 and 1 not including 1 and 0 --> best use betaregression, but gaussian would probably give similar estimates
 
 ## now let's take a look at correlation trends
@@ -246,8 +274,6 @@ preplot5
 dev.off()
 
 ## Let's model
-
-
 names(data.dyad)
 
 # some BMI have NAs, this is not a problem for this model, but it will be for MCMCglmm (null model)
@@ -263,14 +289,16 @@ names(data.dyad)
 #saveRDS(model1, "tmp/BRMmodel1.rds")
 #
 #### This is our final model
-modelLocSpa<-brm(Microbiome_similarity~1+ spatial+locality+BMI+genetic_dist+Parasite+
-                (1|mm(IDA,IDB)),
-                data = data.dyad,
-                family= "gaussian",
-                warmup = 1000, iter = 3000,
-                cores = 50, chains = 10,
-                inits=0)
-saveRDS(modelLocSpa, "tmp/BRMmodelLocSpac.rds")
+#modelLocSpa<-brm(Microbiome_similarity~1+ spatial+locality+BMI+genetic_dist+Parasite+
+#                (1|mm(IDA,IDB)),
+#                data = data.dyad,
+#                family= "gaussian",
+#                warmup = 1000, iter = 3000,
+#                cores = 50, chains = 10,
+#                inits=0)
+#saveRDS(modelLocSpa, "tmp/BRMmodelLocSpac.rds")
+
+modelLocSpa <- readRDS("tmp/BRMmodelLocSpac.rds")
 
 #modelHI<-brm(Microbiome_similarity~1+ spatial+locality+BMI+HI+Parasite+
 #                (1|mm(IDA,IDB)),
@@ -282,21 +310,21 @@ saveRDS(modelLocSpa, "tmp/BRMmodelLocSpac.rds")
 #saveRDS(modelHI, "tmp/BRMmodelHI.rds")
 #model<-readRDS("tmp/BRMmodelLocSpa.rds")
 
-# Model doesnt't like NA's
-data.dyad2 <- data.dyad[!is.na(data.dyad$BMI),]
 #MCMCglmm gaussian model
-mcmcglmm_model<-MCMCglmm(Microbiome_similarity~1+Parasite+BMI+spatial+genetic_dist+locality,
-                            data=data.dyad2,
-                            family= "gaussian",
-                            random =~ mm(IDA+IDB),
-                            verbose=FALSE)
+#mcmcglmm_model<-MCMCglmm(Microbiome_similarity~1+Parasite+BMI+spatial+genetic_dist+locality,
+#                            data=data.dyad,
+#                            family= "gaussian",
+#                            random =~ mm(IDA+IDB),
+#                            verbose=FALSE)
+#saveRDS(mcmcglmm_model, "tmp/mcmcglmm_model.rds")
+mcmcglmm_model <- readRDS("tmp/mcmcglmm_model.rds")
 
-saveRDS(mcmcglmm_model, "tmp/mcmcglmm_model.rds")
+summary(mcmcglmm_model)
 
 #Denisty overlay = # Compare distribution of response variable to distributions of a set of predicted response variable values based on model -- are they a good fit?
-pp1<-pp_check(model)
+#pp1<-pp_check(model)
 
-#summary(model1)
+summary(modelLocSpa)
 
 model1_transformed <- ggs(modelLocSpa)
 
@@ -360,19 +388,12 @@ ggplot(filter(model1_transformed, Parameter == "b_genetic_dist", Iteration > 100
                       labs(title = "Posterior Density of Regression Coefficient for Extraversion")
 
 
-library(ggplot2)
-library(bayesplot)
-library(bayestestR)
-library(brms)
-library(MCMCglmm)
-
-resdf1$Predictor
 
                                         #A. Quick LINEPLOT for non-interaction models
 plot1 <- mcmc_plot(modelLocSpa,
                 type = "intervals",
                 prob = 0.95,
-                pars= rownames(fixef(model1))[2:nrow(fixef(model1))])
+                pars= rownames(fixef(modelLocSpa))[2:nrow(fixef(modelLocSpa))])
 
 plot1
 
@@ -395,48 +416,19 @@ plot2<-ggplot(resdf1,aes(x=Estimate,y=Predictor,colour=Predictor))+
 
 plot2
 
-rownames(fixef(model1))[2:nrow(fixef(model1))]
+rownames(fixef(modelLocSpa))[2:nrow(fixef(modelLocSpa))]
 
 # Alternative: Construct the model with MCMCglmm package (limitations with response distribution, but quicker)
-
-library(MCMCglmm)
 
 # cross validation by approximat leave-one-out corss validation (LOO-CV)
 #loo_t <- loo(modelLocSpa)
 
+
 ## compare the models
 #loo_compare(loo(x), loo(y))
 
-library(magrittr)
-library(dplyr)
-library(purrr)
-library(forcats)
-library(tidyr)
-library(modelr)
-library(ggdist)
-library(tidybayes)
-library(ggplot2)
-library(cowplot)
-library(rstan)
-library(brms)
-library(ggrepel)
-library(RColorBrewer)
-library(gganimate)
-library(posterior)
-library(distributional)
-
-get_variables(modelLocSpa)[1:200]
 
 ###################
-
-data.dyad %>%
-    data_grid(mm(IDA,IDB)) %>%
-    add_predicted_draws(model1) %>%
-    ggplot(aes(x = .prediction, y = mm(IDA,IDB))) +
-    stat_slab()
-
-
-data.dyad$ID
 
 # sanity check
 all(sample_names(PS.mP)==key$ID)
@@ -454,36 +446,150 @@ tax[which(tax$Genus=="Unknown_genus_in_NA"),]$Genus<-paste0("Unknown_genus_in_",
 tax[which(tax$Genus=="Unknown_genus_in_NA"),]$Genus<-paste0("Unknown_genus_in_",tax[which(tax$Genus=="Unknown_genus_in_NA"),]$Phylum)
 
 tax_G<-as.data.frame(table(tax[,6]))
-genuses<- tax_G$Var1
-genuses<-c("none",genuses)
 
-tax_G
+genuses<- as.character(tax_G$Var1)
 
+genuses <- append('none', genuses)
 
-summary(mcmcglmm_model)
-
-mcmclgmm_model <- readRDS("tmp/Model4_MCMCglmm.rds")
-
-dropnumber <- length(genuses)#323
-model_minutes<-10
+dropnumber <- length(genuses)#199
+model_minutes<-2
 cores <- 80
-runtime<-(dropnumber*model_minutes)/cores
+(dropnumber*model_minutes)/cores
 
-library(parallel)
-library(doParallel)
-                                        #start cluster
+
+
+#start cluster
 dropRes_list<-list()
-cl <- parallel::makeCluster(40, type="FORK")
+
+cl <- parallel::makeCluster(80, type="FORK")
+
 doParallel::registerDoParallel(cl)
+
+## changing names here, to test the loop below,
+
+key<-data.frame(ID=sample_data(PS.mP)$Mouse_ID, Sample_name=sample_data(PS.mP)$Mouse_ID)
+
+data.dyad_REAL <- data.dyad
+
+names(data.dyad_REAL)
+
 dropRes_list<-foreach(i = 1:length(genuses)) %dopar% {
     library(phyloseq)
-#choose the genus to drop and prune the taxa to keep everything else
+    #choose the genus to drop and prune the taxa to keep everything else
     gen.i<-genuses[i]
     taxa_tokeep<-rownames(tax[which(tax$Genus!=genuses[i]),])
     mic.i<-prune_taxa(taxa_tokeep, PS.mP)
-#Calculate Jaccard and Bray-Curtis microbiome dissimilarity for each mouse pair
+    #Calculate Jaccard and Bray-Curtis microbiome dissimilarity for each mouse pair
     JACM.i<- as.matrix(phyloseq::distance(mic.i, method="jaccard"))
     BRAY.i<- as.matrix(phyloseq::distance(mic.i, method="bray"))
-#Unravel dissimilarity matrices into vectors
+    #Unravel dissimilarity matrices into vectors
     bray<-c(as.dist(BRAY.i))
     jac<-c(as.dist(JACM.i))
+
+    #Make a new dyadic data frame from these vectors and order it to be in the same order as       the original dyadic data frame
+    data.dyad.i<-data.frame(Jaccard=jac,BrayCurtis=bray)
+    # extracting Sample_name-combinations of the matrix
+    list<-expand.grid(key$Sample_name,key$Sample_name)
+    # This created sample-to-same-sample pairs as well. Get rid of these:
+    list<-list[which(list$Var1!=list$Var2),]
+    # the resulting list still has both quantiles of the original matrix (i.e. all values are doubled) in--> add 'unique' key and subset to one quantile only
+    list$key <- apply(list, 1, function(x)paste(sort(x), collapse=''))
+    list<-subset(list, !duplicated(list$key))
+    # Sample_name combinations are now in the same order as the lower quantile value vector
+    # So we can add dyad name and each participant ID to dyadic dataframe
+    data.dyad.i$Sample_A<-list$Var2
+    data.dyad.i$Sample_B<-list$Var1
+
+    # extracting combinations of individual IDs for each pair
+    keyA<-key[,c("ID","Sample_name")]
+    colnames(keyA)<-c("IDA","Sample_A")
+    keyB<-key[,c("ID","Sample_name")]
+    colnames(keyB)<-c("IDB","Sample_B")
+
+    keyA<-keyA[match(data.dyad.i$Sample_A,keyA$Sample_A),]
+    keyB<-keyB[match(data.dyad.i$Sample_B,keyB$Sample_B),]
+
+    data.dyad.i$IDA<-keyA$IDA
+    data.dyad.i$IDB<-keyB$IDB
+
+    # Make sure you have no self comparisons in the data (This is the case by default here,       since we are using just one sample per individual)
+    data.dyad.i<-data.dyad.i[which(data.dyad.i$IDA!=data.dyad.i$IDB),] #
+
+    ### Combine new Jaccard variable with rest of dyadic data columns
+    data.dyad<-data.dyad_REAL
+    data.dyad$Jaccard<-data.dyad.i$Jaccard
+
+    #factorize terms used for multimembership random structure and make sure levels are     same and in same order
+    data.dyad$IDA<-as.factor(data.dyad$IDA)
+    data.dyad$IDB<-as.factor(data.dyad$IDB)
+    all(levels(data.dyad$IDA)==levels(data.dyad$IDB))#T
+
+#The MCMCglmm model
+dropmodel<-MCMCglmm(Microbiome_similarity~1+Parasite+BMI+spatial+genetic_dist+locality,
+                            data=data.dyad,
+                            family= "gaussian",
+                            random =~ mm(IDA+IDB),
+                            verbose=FALSE)
+saveRDS(mcmcglmm_model, "tmp/mcmcglmm_model.rds")
+
+   ASVs_dropped.i<-nrow(tax_table(PS.mP))-nrow(tax_table(mic.i))
+   resdf.i<-data.frame(Genus_dropped=gen.i,
+                      ASVs_dropped=ASVs_dropped.i,
+                      Parasite_Estimate=summary(dropmodel)$solutions["Parasite",]["post.mean"],
+                      Parasite_lCI=summary(dropmodel)$solutions["Parasite",]["l-95% CI"],
+                      Parasite_uCI=summary(dropmodel)$solutions["Parasite",]["u-95% CI"],
+                      genetic_Estimate=summary(dropmodel)$solutions["genetic_dist",]["post.mean"],
+                      genetic_lCI=summary(dropmodel)$solutions["genetic_dist",]["l-95% CI"],
+                      genetic_uCI=summary(dropmodel)$solutions["genetic_dist",]["u-95% CI"]
+                      )
+    return(resdf.i)
+}
+
+parallel::stopCluster(cl)
+saveRDS(dropRes_list,"tmp/dropRes_list.rds")
+
+#########################################################################
+##rbind the resulting data frames to single master data frame
+        dropResults<-data.frame(Genus_dropped=NA,
+                                            ASVs_dropped=NA,
+                                            Parasite_Estimate=NA,
+                                            Parasite_lCI=NA,
+                                            Parasite_uCI=NA,
+                                            genetic_Estimate=NA,
+                                            genetic_lCI=NA,
+                                            genetic_uCI=NA)
+                                            
+  for(j in 1:length(genuses)){
+    dropResults<-rbind(dropResults,dropRes_list[[j]])
+  }
+
+dropResults<-dropResults[2:nrow(dropResults),]
+dropResults$Genus_dropped2<-genuses
+
+dropRes_list[[100]]
+
+saveRDS(dropResults,"dropResults_genus.rds")
+
+
+
+#For each microbial genera, calculate their importance on social association effect on microbiome
+Parasite_CIbr_baseline<-dropResults[which(dropResults$Genus_dropped=="none"),]$Parasite_CIbr
+
+dropResults$Parasite_CIbr<-abs(dropResults$Parasite_uCI-dropResults$Parasite_lCI)
+
+dropResults$Parasite_CIbr_increase<- dropResults$Parasite_CIbr-Parasite_CIbr_baseline
+
+                                        #Only those genera whose drop increases the uncertainty around an effect will be considered important for that effect:
+dropResults[which(dropResults$Parasite_CIbr_increase<0),]$Parasite_CIbr_increase<-0
+
+                                        #Importance value is this increase in uncertainty divided by the square root of how many ASVs were dropped, and multiplied by 100 to increase the scale.
+dropResults$IMPORTANCE_PARASITE<-(dropResults$Parasite_CIbr_increase/Parasite_CIbr_baseline)/sqrt(dropResults$ASVs_dropped)*100
+
+dropResults$Parasite_CIbr_increase/Parasite_CIbr_baseline/sqrt(
+
+dropResults$ASVs_dropped
+
+dropResults$Genus_dropped
+
+                                                              
+dropResults$IMPORTANCE_PARASITE

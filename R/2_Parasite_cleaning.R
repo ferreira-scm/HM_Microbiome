@@ -63,7 +63,6 @@ ampdf$species[ampdf$species=="name"] <- "28S"
 PS.T@tax_table[which(PS.T@tax_table[,6]=="Oxyurida"),7] <- ampdf$species
 fPS@tax_table[which(fPS@tax_table[,6]=="Oxyurida"),7] <- ampdf$species
 PS.TSS@tax_table[which(PS.TSS@tax_table[,6]=="Oxyurida"),7] <- ampdf$species
-PS.CLR@tax_table[which(PS.CLR@tax_table[,6]=="Oxyurida"),7] <- ampdf$species
 
 # now the correlation networks
 ######## Now we do a correlation network to see the likelihood of ASV within the same genus being from the same species.

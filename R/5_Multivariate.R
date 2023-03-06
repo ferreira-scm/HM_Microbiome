@@ -39,7 +39,11 @@ table <- anova(Mod1, p.uni = "adjusted")
 
 which(table$uni.p<0.05)
 
-table
+str(table)
+
+rownames(table$table)
+
+
 
 saveRDS(table, "tmp/Mvabund_anovaPS10.R")
 

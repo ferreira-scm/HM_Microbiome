@@ -3,15 +3,19 @@ library(vegan)
 PS.T <- readRDS("tmp/PS.T.rds")
 sdata <- PS.T@sam_data
 
-# betadiversity (BC distances), permanova and visualisatio with MDS
-dist_bray <- vegdist(PS.T@otu_table, method="bray")
-
+# removing parasites from gut community
 PS.mP <- subset_taxa(PS.T, !Genus %in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas"))
+# Bray Curtis dissimilarity matrix
 dist_mP <- vegdist(PS.mP@otu_table, method="bray")
 
+# Jaccard distances
+jac_mP <- vegdist(PS.mP@otu_table, method="jaccard")
+
+# Isolating parasite community
 Parasite <- subset_taxa(PS.T, Genus %in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas"))
 Parasite <- phyloseq::prune_samples(sample_sums(Parasite)>0, Parasite)
-dist_para <- phyloseq::distance(Parasite, method="bray", type="samples")
+# BC dissimilary
+dist_para <- vegdist(Parasite@otu_table, method="bray")
 
 sdata_p <- Parasite@sam_data
 
@@ -20,8 +24,8 @@ permaPara <- adonis2(dist_para~
                    sdata_p$hi+
                    sdata_p$BMI+
                    sdata_p$Year+
-#                   sdata_p$Co_infb+
-                   sdata_p$Locality,
+                   sdata_p$Co_infb,
+                   strata=sdata_p$Locality,
                    by="margin")
 
 permaPara
@@ -126,6 +130,27 @@ permaPS_T_para <- adonis2(dist_mP~
                    sdata$Locality,
                    by="margin")
 
+permaJac <- adonis2(jac_mP~
+                         sdata$Eimeria_ferrisi_asv+
+                         sdata$Eimeria_falciformis_asv+
+                         sdata$Eimeria_vermiformis_asv+
+                         sdata$Hymenolepis_asv+
+                         sdata$Trichuris_asv+
+                         sdata$Mastophorus_asv+
+                         sdata$Ascaridida_asv+
+                         sdata$Crypto_asv+
+                         sdata$Tritrichomonas_asv+
+                         sdata$Aspiculuris_asv+
+                         sdata$Syphacia_asv+
+                   sdata$Co_infb+
+                   sdata$Sex+
+                   sdata$hi+
+                   sdata$BMI+
+                   sdata$Year+
+                   sdata$Locality,
+                   by="margin")
+
+
+permaJac
 
 permaPS_T_para
-
