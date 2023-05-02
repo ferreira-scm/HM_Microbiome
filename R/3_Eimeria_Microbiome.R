@@ -1,10 +1,168 @@
 library(phyloseq)
 library(vegan)
-PS.T <- readRDS("tmp/PS.T.rds")
-sdata <- PS.T@sam_data
+library(RColorBrewer
+library(microshades)
 
+PS.TSS <- readRDS("tmp/PS.TSS_filtered.rds")
+
+sdata <- PS.TSS@sam_data
+### Let's see what is going on here
+Euk <- subset_taxa(PS.TSS, Kingdom%in%"Eukarya")
+gen.e <- get_taxa_unique(Euk, "Genus")
+gen.e[-grep("Unknown", gen.e)]
+
+Bac <- subset_taxa(PS.TSS, Kingdom%in%"Bacteria")
+gen.e <- get_taxa_unique(Bac, "Genus")
+gen.e[-grep("Unknown", gen.e)]
+
+Arc <- subset_taxa(PS.TSS, Kingdom%in%"Archaea")
+gen.e <- get_taxa_unique(Arc, "Genus")
+
+# Jaccard distances
+jac <- vegdist(PS.TSS@otu_table, method="jaccard")
+
+# Bray Curtis dissimilarity matrix
+bc <- vegdist(PS.TSS@otu_table, method="bray")
+
+permaJac1 <- adonis2(jac~
+                   sdata$Sex+
+                   sdata$hi+
+                   sdata$BMI+
+                   sdata$Year+
+                   sdata$Locality,
+                   by="margin")
+
+permabc1 <- adonis2(bc~
+                   sdata$Sex+
+                   sdata$hi+
+                   sdata$BMI+
+                   sdata$Year+
+                   sdata$Locality,
+                   by="margin")
+
+
+permaJac1
+permabc1
+
+### Plotting
+PS.TSS@sam_data$t <- "a"
+
+Euk <- subset_taxa(PS.TSS, Kingdom=="Eukarya")
+Euk.m <- merge_samples(Euk, "t")
+Prok<- subset_taxa(PS.TSS, Kingdom%in%c("Bacteria", "Archaea"))
+Prok.m <- merge_samples(Prok, "t")
+PS.m <- merge_samples(PS.TSS, "t")
+
+PS.m <- transform_sample_counts(PS.m, function(x) 100*x/sum(x))
+Euk.m <- transform_sample_counts(Euk.m, function(x) 100*x/sum(x))
+Prok.m <- transform_sample_counts(Prok.m, function(x) 100*x/sum(x))
+
+PS.m <- tax_glom(PS.m, "Kingdom")
+ps.m <- psmelt(PS.m)
+
+Euk.m <- tax_glom(Euk.m, "Genus")
+Prok.m <- tax_glom(Prok.m, "Genus")
+
+top30 <- names(sort(taxa_sums(Euk.m), TRUE)[1:10])
+Euk.30 <- prune_taxa(top30, Euk.m)
+euk.m <- psmelt(Euk.30)
+
+euk.m <- euk.m[, c("OTU", "Abundance", "Phylum", "Family", "Genus")]
+
+euk.m <- rbind(data.frame(OTU="other", Abundance=100-sum(euk.m$Abundance), Phylum="other", Family="other", Genus="other"), euk.m)
+euk.m <- euk.m[order(euk.m$Abundance),]
+euk.m$Genus <-factor(euk.m$Genus)
+
+levels(euk.m$Genus) <- euk.m$Genus
+
+top30 <- names(sort(taxa_sums(Prok.m), TRUE)[1:10])
+Prok.30 <- prune_taxa(top30, Prok.m)
+prok.m <- psmelt(Prok.30)
+prok.m <- prok.m[, c("OTU", "Abundance", "Phylum", "Family", "Genus")]
+prok.m <- rbind(data.frame(OTU="other", Abundance=100-sum(prok.m$Abundance), Phylum="other", Family="other", Genus="other"), prok.m)
+
+
+#levels(euk.m$Genus) <-c("other", as.character(euk.m$Genus[!euk.m$Genus=="other"]))
+
+library(ggpubr)
+
+ggbarplot(ps.m, y="Abundance", fill="Kingdom", position=position_stack())+
+        theme_minimal(base_size=12)+
+    scale_fill_manual(values=col)+
+    ylab("Abundance (%)")+
+    xlab("")+
+    labs(fill="Domain")+
+    theme(axis.title.x=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank())
+
+nb <- length(unique(euk.m$Genus))
+mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(nb)
+
+ggbarplot(euk.m, y="Abundance", fill="Genus", position=position_stack())+
+    theme_minimal(base_size=12)+
+    scale_fill_manual(values=mycolors)+
+    ylab("Abundance (%)")+
+    xlab("")+
+    labs(fill="Genus")+
+    theme(axis.title.x=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank())
+
+nb <- length(unique(prok.m$Genus))
+mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(nb)
+
+ggbarplot(prok.m, y="Abundance", fill="Genus", position=position_stack())+
+    theme_minimal(base_size=12)+
+    scale_fill_manual(values=mycolors)+
+    ylab("Abundance (%)")+
+    xlab("")+
+    labs(fill="Genus")+
+    theme(axis.title.x=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank())
+
+
+
+    geom_bar(position="stack")
+
+col <- c(microshades_palette("micro_blue", 1, lightest=FALSE)[1], microshades_palette("micro_orange", 3)[2], microshades_palette("micro_cvd_turquoise", 3)[2], microshades_palette("micro_purple")[1])
+
+
+a <- plot_bar(PS.m, fill="Kingdom")+
+    theme_minimal(base_size=12)+
+    scale_fill_manual(values=col)+
+    ylab("Abundance (%)")+
+    xlab("")+
+    labs(fill="Domain")+
+    theme(axis.title.x=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank())
+
+
+
+
+plot_bar(Euk.30, fill="Genus")
+
+
+
+ps.19 <- psmelt(PS.19)
+
+names(ps.19)
+
+ps.19 <- ps.19[, c("OTU", "Kingdom", "Family", "Genus")]
+
+oth <- data.frame(OTU="other", Kingdom="other", Family="other", Genus="other")
+
+ps.19 <- rbind(oth, ps.19)
+
+ps.19
+
+plot_bar(PS.19, fill="Genus")
+
+#################### parasite stuff
 # removing parasites from gut community
-PS.mP <- subset_taxa(PS.T, !Genus %in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas"))
+PS.mP <- subset_taxa(PS.TSS, !Genus %in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas"))
 # Bray Curtis dissimilarity matrix
 dist_mP <- vegdist(PS.mP@otu_table, method="bray")
 
@@ -12,7 +170,7 @@ dist_mP <- vegdist(PS.mP@otu_table, method="bray")
 jac_mP <- vegdist(PS.mP@otu_table, method="jaccard")
 
 # Isolating parasite community
-Parasite <- subset_taxa(PS.T, Genus %in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas"))
+Parasite <- subset_taxa(PS.TSS, Genus %in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas"))
 Parasite <- phyloseq::prune_samples(sample_sums(Parasite)>0, Parasite)
 # BC dissimilary
 dist_para <- vegdist(Parasite@otu_table, method="bray")
@@ -83,7 +241,7 @@ library(lme4)
 library(lmerTest)
 library(effects)
 
-df$Co_inf <- as.numeric(df$Co_inf)
+PS.df
 
 ## testing the effect of parasites in shanon diversity
 
@@ -105,8 +263,6 @@ shaModel <- lmer(shannon~BMI+
 summary(shaModel)
 
 plot(Effect("Tritrichomonas_asv", shaModel))
-
-0.00107+0.00260+0.00101+0.00129+0.00139+0.00131+0.00147+0.00143+0.00507+0.00257+0.00476+0.00491
 
 sdata$Co_infb <- as.factor(sdata$Co_infb)
 
