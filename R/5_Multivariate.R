@@ -1,52 +1,48 @@
-source("R/2_Parasite_cleaning.R")
+library("ggmap")
+library(sf)
+library("rnaturalearthdata")
+library("rnaturalearth")
 
-library(mvabund)
+library(legendMap)
 
-PS.T_sub
+library("legendMap")
 
-KeepTaxap <- microbiome::prevalence(PS.T_sub)>0.10
-PS10 <- phyloseq::prune_taxa(KeepTaxap, PS.T_sub)
-
-ASVmv <- mvabund(otu_table(PS10))
-
-boxplot(otu_table(PS10), horizontal=TRUE, las=2)
-
-sdata <- sample_data(PS10)
-
-Mod1 <- manyglm(ASVmv~
-                        sdata$Eimeria_ferrisi_asv+
-                        sdata$Eimeria_falciformis_asv+
-                        sdata$Eimeria_vermiformis_asv+
-                        sdata$Tritrichomonas_asv+
-                        sdata$Syphacia_asv+
-                        sdata$Aspiculuris_asv+
-                        sdata$Trichuris_asv+
-                        sdata$Hymenolepis_asv+
-                        sdata$Ascaridida_asv+
-                        sdata$Crypto_asv+
-                        sdata$Mastophorus_asv+
-                        sdata$Sex+
-                        sdata$hi+
-                        sdata$Year+
-                        sdata$BMI+
-                        sdata$Locality)
-
-saveRDS(Mod1, "tmp/Mvabund_PS10.R")
-
-plot(Mod1)
-
-table <- anova(Mod1, p.uni = "adjusted")
-
-which(table$uni.p<0.05)
-
-str(table)
-
-rownames(table$table)
+PS.TSS <- readRDS("tmp/PS.TSS_filtered.rds")
 
 
+world <- ne_countries(scale="medium", returnclass="sf")
+class(world)
 
-saveRDS(table, "tmp/Mvabund_anovaPS10.R")
+metadf <- PS.TSS@sam_data
 
-#table2 <- anova.manyglm(Mod1, p.uni = "adjusted", show.time="all")
+coordf <- data.frame(Lon=metadf$Longitude, Lat=metadf$Latitude)
 
-#saveRDS(table2, "tmp/Mvabund_PS10_anova.manyglm.R")
+#sites <- st_as_sf(coordf, coords = c("Lon", "Lat"),
+#                             crs = 4326, agr = "constant")
+
+library("ggspatial")
+
+sampling <-
+    ggplot(data=world)+
+#    ggmap(area)+
+    geom_sf()+
+    geom_point(data=metadf,aes(x=Longitude, y=Latitude, fill=HI), size=4, alpha=0.5, shape=21)+
+    coord_sf(xlim=c(7, 16), ylim=c(47, 55), expand=FALSE)+
+    scale_fill_gradient2("Hybrid\nindex", high="red", low="navy", mid="white", midpoint=0.5)+
+#    xlab("Longitude", ylab="Latitude")+
+#    annotation_scale(location = "bl", width_hint = 0.5) +
+#    annotation_north_arrow(location = "bl", which_north = "true",,
+#                                         style = north_arrow_fancy_orienteering) +
+    scale_bar(lon = 8, lat = 54.2, arrow_length = 10, arrow_distance = 50,
+                 distance_lon = 50, distance_lat = 7, distance_legend = 20,
+                 dist_unit = "km", orientation = FALSE, legend_size = 3)+
+    theme_bw()+
+    theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+
+sampling
+
+saveRDS(sampling, "tmp/map.RDS")
+
+#saveRDS(sampling, "tmp/sampling_map.rds")
+ggplot2::ggsave(file="fig/Figure1.pdf", sampling, width = 120, height = 120, dpi = 300, units="mm")

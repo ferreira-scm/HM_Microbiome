@@ -60,6 +60,6 @@ PS.TSS@tax_table[8,5] <- "Unknown_family_in_Eukarya"
 PS.TSS@tax_table[8,6] <- "Unknown_genus_in_Eukarya"
 
 
-
+PS.TSS <- prune_taxa(taxa_sums(PS.TSS) > 0, PS.TSS) 
 saveRDS(PS.TSS, "tmp/PS.TSS_filtered.rds")
 
