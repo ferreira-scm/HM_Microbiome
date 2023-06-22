@@ -11,7 +11,7 @@ library(phyloseq)
 # We also remove the silva handlers from the taxonomic table (all the "g__", "s__"...), so this
 #makes the script run slower than expected.
 
-# finally, we do a bit of cleaning up in the sampla data, by adding inputed immune genes from Fay
+# finally, we do a bit of cleaning up in the sampla data, by adding inputed immune gene responses
 # and by inputing the few missing values for BMI and HI
 
 
@@ -127,7 +127,7 @@ fPSE <- subset_taxa(fPS, Genus%in%"Eimeria")
 fPSE <- tax_glom(fPSE, "Species")
 fPS <- merge_phyloseq(fPSE, fPS1)
 
-#### let's adjust the metadata too, to include Fay's immune genes that have been inputed
+#### let's adjust the metadata too, to includ immune gene measures that have been inputed
 Immune <- read.csv("https://raw.githubusercontent.com/fayweb/Eimeria_mouse_immunity/main/output_data/2.imputed_MICE_data_set.csv")
 #subsetting to filed animals only
 Immune <- Immune[Immune$origin=="Field",]

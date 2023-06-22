@@ -4,18 +4,19 @@ library(RColorBrewer)
 library(microshades)
 
 PS.TSS <- readRDS("tmp/PS.TSS_filtered.rds")
+PS.TSS@sam_data$t <- "a"
 
-PS.TSS <- prune_taxa(taxa_sums(PS.TSS) > 0, PS.TSS) 
 
 sdata <- PS.TSS@sam_data
 ### Let's see what is going on here
 Euk <- subset_taxa(PS.TSS, Kingdom%in%"Eukarya")
-gen.e <- get_taxa_unique(Euk, "Genus")
-gen.e[-grep("Unknown", gen.e)]
+#gen.e <- get_taxa_unique(Euk, "Genus")
+#gen.e[-grep("Unknown", gen.e)]
 
 Bac <- subset_taxa(PS.TSS, Kingdom%in%"Bacteria")
-gen.e <- get_taxa_unique(Bac, "Genus")
-gen.e[-grep("Unknown", gen.e)]
+#gen.e <- get_taxa_unique(Bac, "Genus")
+#gen.e[-grep("Unknown", gen.e)]
+
 
 # Jaccard distances
 jac <- vegdist(PS.TSS@otu_table, method="jaccard")
@@ -46,13 +47,7 @@ permaChi1 <- adonis2(chi~
 permaJac1
 permaChi1
 
-### Plotting
-PS.TSS@sam_data$t <- "a"
 
-Euk <- subset_taxa(PS.TSS, Kingdom=="Eukarya")
-Bac<- subset_taxa(PS.TSS, Kingdom=="Bacteria")
-
-# Jaccard distances
 jac.e <- vegdist(Euk@otu_table, method="jaccard")
 jac.bac <- vegdist(Bac@otu_table, method="jaccard")
 
@@ -85,18 +80,17 @@ permaJac.bac <- adonis2(jac.bac~
 
 
 Euk.m <- merge_samples(Euk, "t")
-Prok.m <- merge_samples(Prok, "t")
+Bac.m <- merge_samples(Bac, "t")
 PS.m <- merge_samples(PS.TSS, "t")
 
 PS.m <- transform_sample_counts(PS.m, function(x) 100*x/sum(x))
 Euk.m <- transform_sample_counts(Euk.m, function(x) 100*x/sum(x))
-Prok.m <- transform_sample_counts(Prok.m, function(x) 100*x/sum(x))
+Bac.m <- transform_sample_counts(Bac.m, function(x) 100*x/sum(x))
 
-PS.m <- tax_glom(PS.m, "Kingdom")
-ps.m <- psmelt(PS.m)
-
-Euk.m <- tax_glom(Euk.m, "Genus")
-Prok.m <- tax_glom(Prok.m, "Genus")
+#PS.m <- tax_glom(PS.m, "Kingdom")
+#ps.m <- psmelt(PS.m)
+#Euk.m <- tax_glom(Euk.m, "Genus")
+#Bac.m <- tax_glom(Bac.m, "Genus")
 
 top30 <- names(sort(taxa_sums(Euk.m), TRUE)[1:10])
 Euk.30 <- prune_taxa(top30, Euk.m)
@@ -110,20 +104,21 @@ euk.m$Genus <-factor(euk.m$Genus)
 
 levels(euk.m$Genus) <- euk.m$Genus
 
-top30 <- names(sort(taxa_sums(Prok.m), TRUE)[1:10])
-Prok.30 <- prune_taxa(top30, Prok.m)
-prok.m <- psmelt(Prok.30)
-prok.m <- prok.m[, c("OTU", "Abundance", "Phylum", "Family", "Genus")]
-prok.m <- rbind(data.frame(OTU="other", Abundance=100-sum(prok.m$Abundance), Phylum="other", Family="other", Genus="other"), prok.m)
+top30 <- names(sort(taxa_sums(Bac.m), TRUE)[1:10])
+Bac.30 <- prune_taxa(top30, Bac.m)
+Bac.m <- psmelt(Bac.30)
+Bac.m <- Bac.m[, c("OTU", "Abundance", "Phylum", "Family", "Genus")]
+Bac.m <- rbind(data.frame(OTU="other", Abundance=100-sum(Bac.m$Abundance), Phylum="other", Family="other", Genus="other"), Bac.m)
 
 
 #levels(euk.m$Genus) <-c("other", as.character(euk.m$Genus[!euk.m$Genus=="other"]))
 
 library(ggpubr)
 
+
 ggbarplot(ps.m, y="Abundance", fill="Kingdom", position=position_stack())+
         theme_minimal(base_size=12)+
-    scale_fill_manual(values=col)+
+#    scale_fill_manual(values=col)+
     ylab("Abundance (%)")+
     xlab("")+
     labs(fill="Domain")+
@@ -144,10 +139,23 @@ ggbarplot(euk.m, y="Abundance", fill="Genus", position=position_stack())+
           axis.text.x=element_blank(),
           axis.ticks.x=element_blank())
 
-nb <- length(unique(prok.m$Genus))
+nb <- length(unique(Bac.m$Genus))
 mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(nb)
 
-ggbarplot(prok.m, y="Abundance", fill="Genus", position=position_stack())+
+Bac.m$Abundance
+
+Bac.m$Genus <- factor(Bac.m$Genus, levels=Bac.m$Genus)
+
+ggplot(Bac.m, aes(x="", y=Abundance, fill=Genus))+
+              geom_bar(width=1, stat="identity", color="white")+
+    theme(axis.line=element_blank())+
+    coord_polar(theta="y",start=0)+
+    theme_void() +
+      theme(legend.title=element_blank(), legend.position="bottom", legend.text = element_text(size = 8))
+              
+
+
+ggbarplot(Bac.m, y="Abundance", fill="Genus", position=position_stack())+
     theme_minimal(base_size=12)+
     scale_fill_manual(values=mycolors)+
     ylab("Abundance (%)")+

@@ -7,12 +7,19 @@ PS.TSS <- readRDS("tmp/PS.TSS_filtered.rds")
 PS.TSS@sam_data$t <- "a"
 
 
+
+rich <- estimate_richness(PS.TSS, measures=c("Shannon", "InvSimpson"))
+
+rich$InvSimpson
+    
+PS.TSS@sam_data$Shannon <- rich$Shannon
+PS.TSS@sam_data$InvSimpson <- rich$InvSimpson
+
 sdata <- PS.TSS@sam_data
 ### Let's see what is going on here
 Euk <- subset_taxa(PS.TSS, Kingdom%in%"Eukarya")
 #gen.e <- get_taxa_unique(Euk, "Genus")
 #gen.e[-grep("Unknown", gen.e)]
-
 Bac <- subset_taxa(PS.TSS, Kingdom%in%"Bacteria")
 #gen.e <- get_taxa_unique(Bac, "Genus")
 #gen.e[-grep("Unknown", gen.e)]
@@ -23,9 +30,6 @@ jac <- vegdist(PS.TSS@otu_table, method="jaccard")
 
 # Bray Curtis dissimilarity matrix
 chi <- vegdist(PS.TSS@otu_table, method="chisq")
-
-
-
 
 permaJac1 <- adonis2(jac~
                    sdata$Sex+
@@ -78,6 +82,39 @@ permaJac.bac <- adonis2(jac.bac~
                    sdata$Locality,
                    by="margin")
 
+
+## richness
+
+class(sdata) <- "data.frame"
+
+sdata$Shannon
+
+library(lmerTest)
+
+library(MuMIn)
+
+library(parasiteLoad)
+
+Shan <- lmerTest::lmer(Shannon~Sex+hi+BMI+Year+(1|Locality), data=sdata)
+
+InvS <- lmerTest::lmer(InvSimpson~Sex+hi+BMI+Year+(1|Locality), data=sdata)
+
+summary(Shan)
+
+summary(InvS)
+
+r.squaredGLMM(Shan)
+
+r.squaredGLMM(InvS)
+
+sdata$Shannon
+
+plot(sdata$HI, sdata$Shannon)
+
+source("bin/TestDistributions.R")
+source("bin/bananaplotNoCI.R")
+
+parasiteLoad::analyse(data = sdata, response = "Shannon", model = "negbin", group = "Sex", hybridIndex = "HI", myparamBounds="default")
 
 Euk.m <- merge_samples(Euk, "t")
 Bac.m <- merge_samples(Bac, "t")

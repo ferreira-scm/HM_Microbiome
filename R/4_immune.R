@@ -7,8 +7,9 @@ library(ggmcmc)
 library(ggthemes)
 library(ggridges)
 library(vegan)
+library(phyloseq)
 
-PS.T <- readRDS("tmp/PS.T.rds")
+PS.TSS <- readRDS("tmp/PS.TSS_filtered.rds")
 
 ### questions to answer:
 # How does immne gene expression interact with host genetics and parasite/microbiome structre
@@ -16,23 +17,59 @@ PS.T <- readRDS("tmp/PS.T.rds")
 ### Approach 1
 
 # subsetting
-PS.i <- subset_samples(PS.T, !is.na(PS.T@sam_data$TNF))
+PS.i <- subset_samples(PS.TSS, !is.na(PS.TSS@sam_data$TNF))
+
+Parasite <- subset_taxa(PS.i, Genus %in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas"))
+
+Fungi <- subset_taxa(PS.i, Phylum %in% c("Mucoromycota", "Ascomycota", "Basidiomycota"))
 
 # now saving ID names
 key <- data.frame(ID=sample_data(PS.i)$Mouse_ID)
 # metadata
 metadt <- sample_data(PS.i)
 
-# first we need to remove parasites from the microbiome PS object because we will analyse those in separate
-PS.iP <- subset_taxa(PS.i, !Genus %in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas"))
-
 ## 1) Jaccard distance
-JACM <- as.matrix(phyloseq::distance(PS.iP, method="jaccard", type="samples"))
+JACM <- as.matrix(phyloseq::distance(PS.i, method="jaccard", type="samples"))
 # transpose Jaccard disssimilary matrix to Jaccard similarty matrix
 JACM <- 1-JACM
 # sanity check
 all(rownames(JACM)==key)
 dimnames(JACM)<- c(key, key)
+
+## 1) Chisq distance
+CHIM <- as.matrix(vegan::vegdist(PS.i@otu_table, method="chisq"))
+# transpose Chi square disssimilary matrix to similarty matrix
+CHIM <- 1-CHIM
+# sanity check
+all(rownames(CHIM)==key)
+dimnames(CHIM)<- c(key, key)
+
+## 1) Jaccard distance
+JacP <- as.matrix(phyloseq::distance(Parasite, method="jaccard", type="samples"))
+# transpose Jaccard disssimilary matrix to Jaccard similarty matrix
+JacP <- 1-JacP
+# sanity check
+all(rownames(JacP)==key)
+dimnames(JacP)<- c(key, key)
+
+
+## 1) Jaccard distance
+JacF <- as.matrix(phyloseq::distance(Fungi, method="jaccard", type="samples"))
+# transpose Jaccard disssimilary matrix to Jaccard similarty matrix
+JacF <- 1-JacF
+# sanity check
+all(rownames(JacF)==key)
+dimnames(JacF)<- c(key, key)
+
+
+## 1) Chisq distance
+CHIMP <- as.matrix(vegan::vegdist(Parasite@otu_table, method="chisq"))
+# transpose Chi square disssimilary matrix to similarty matrix
+CHIMP <- 1-CHIMP
+# sanity check
+all(rownames(CHIMP)==key)
+dimnames(CHIMP)<- c(key, key)
+
 
 # distance matrix, we need to control for distance?
 distance.df <- metadt[,c("Mouse_ID", "Longitude", "Latitude")]
@@ -81,18 +118,6 @@ for (i in 1:nrow(BMI_frame)){
 }
 dimnames(BMIM) <- c(key, key)
 
-# 5) Creating parasite matrix with chi-sqr dissimilary
-Parasite <- subset_taxa(PS.i, Genus %in%c("Eimeria", "Cryptosporidium", "Tritrichomonas",
-                                            "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus",
-                                            "Trichuris", "Hymenolepis"))
-all(sample_names(Parasite)==key)
-PARA <- as.matrix(vegdist(Parasite@otu_table, method="chisq"))
-# transpose disssimilary matrix to similarty matrix
-PARA <- 1-PARA
-# sanity check
-all(rownames(PARA)==key)
-dimnames(PARA)<- c(key, key)
-
 # 6) Create farm/Locality matrix: 
 #Create data frame with each Individual name (character) and their Age (Character)
 Loc_frame<-metadt[,c("Mouse_ID","Locality")]
@@ -102,9 +127,9 @@ LocM<-array(0,c(nrow(Loc_frame),nrow(Loc_frame)))
 for(i in 1:nrow(Loc_frame)){
     for(j in 1:nrow(Loc_frame)){
         if(Loc_frame$Locality[i]==Loc_frame$Locality[j]){
-            LocM[i,j]= 1
+            LocM[i,j]= "1"
         } else{
-            LocM[i,j]= 0
+            LocM[i,j]= "0"
         }
     }
 }
@@ -138,21 +163,58 @@ for (i in 1:nrow(hi_frame)){
 }
 dimnames(hiM) <- c(key, key)
 
+## 3) Sex pairs
+Sex_frame<-metadt[,c("Mouse_ID","Sex")]
+Sex_frame$Mouse_ID<-as.character(Sex_frame$Mouse_ID)
+Sex_frame$Sex<-as.character(Sex_frame$Sex)
+#Create an empty character matrix to fill with characters
+SEXM<-array(as.character(NA),c(nrow(Sex_frame),nrow(Sex_frame)))
+for(i in 1:nrow(Sex_frame)){
+    for(j in 1:nrow(Sex_frame)){
+        if(Sex_frame$Sex[i]=="F" & Sex_frame$Sex[i]==Sex_frame$Sex[j]){
+            SEXM[i,j]= "FF"}
+        if(Sex_frame$Sex[i]=="M" & Sex_frame$Sex[i]==Sex_frame$Sex[j]){
+           SEXM[i,j]= "MM"}
+        if( Sex_frame$Sex[i]!=Sex_frame$Sex[j]){
+            SEXM[i,j]= "FM"}
+    }
+}
+dimnames(SEXM)<-c(key, key)
+# 6) this matrix will describe the distance in years between samples
+#Transform dates into a numeric variable
+metadt$Year <- as.numeric(metadt$Year)
+#Create data frame with each sample name (character) and sampling time (numeric)
+SampleTime_frame<-metadt[,c("Mouse_ID","Year")]
+#Create an empty matrix to fill with distances
+TEMPM<-array(0,c(nrow(SampleTime_frame),nrow(SampleTime_frame)))
+#Derive matrix with time distances between each sample using abs()-function
+for (i in 1:nrow(SampleTime_frame)){
+ for (j in 1:nrow(SampleTime_frame))
+{TEMPM[i,j]=abs(SampleTime_frame$Year[i] -SampleTime_frame$Year[j])
+  }
+}
+dimnames(TEMPM)<-c(key,key)
 
+
+chi<-c(as.dist(CHIM))
+chiP<-c(as.dist(CHIMP))
 jac<-c(as.dist(JACM))
+jacP<-c(as.dist(JacP))
+jacF<-c(as.dist(JacF))
 bmi<-c(as.dist(BMIM))
 spa<-c(as.dist(SPATM))
 imm<-c(as.dist(IMM))
 gen<-c(as.dist(gen.dis))
-para<-c(as.dist(PARA))
-loc <- c(as.dist(LocM))
+loc <- as.character(c(as.dist(LocM)))
 HIm <- c(as.dist(HIM))
 him <- c(as.dist(hiM))
+tempm <- c(as.dist(TEMPM))
+sex<-c(SEXM[lower.tri(SEXM)])
 
 
 #Combine these vectors into a data frame
-data.dyad<-data.frame(Immune=imm, Parasite=para, BMI=bmi,Microbiome_similarity=jac,spatial=spa,
-                      genetic_dist=gen, locality=loc, HI_dist=HIm, hi_dist=him)
+data.dyad<-data.frame(Immune=imm, BMI=bmi, Microbiome_similarity=jac, spatial=spa,
+                      genetic_dist=gen, locality=loc, HI_dist=HIm, hi_dist=him, hi=him, year=tempm, sex=sex, ParasiteChi=chiP, Microbiome_chi=chi, ParasiteJac=jacP, FungiJac=jacF)
 
 #Now all we need to do is add the identities of both individuals in each dyad as separate columns into the data frame and exclude self-comparisons (as these are not meaningful).
 
@@ -182,48 +244,157 @@ data.dyad<-data.dyad[which(data.dyad$IDA!=data.dyad$IDB),]
 #scale all predictors to range between 0-1 if they are not already naturally on that scale
 #define scaling function:
 range.use <- function(x,min.use,max.use){ (x - min(x,na.rm=T))/(max(x,na.rm=T)-min(x,na.rm=T)) * (max.use - min.use) + min.use }
-scalecols<-c("spatial","genetic_dist", "Parasite", "BMI", "Immune")
+scalecols<-c("spatial","genetic_dist", "BMI", "Immune", "hi", "year")
 for(i in 1:ncol(data.dyad[,which(colnames(data.dyad)%in%scalecols)])){
     data.dyad[,which(colnames(data.dyad)%in%scalecols)][,i]<-range.use(data.dyad[,which(colnames(data.dyad)%in%scalecols)][,i],0,1)
     }
 
 
-preplot1<-ggplot(data = data.dyad, aes(x= Microbiome_similarity, y= Immune))+
-    geom_point(size= 1.2, alpha= .8, position= "jitter")+
-    geom_smooth(method= lm, se= FALSE, col= "red", size= .8)+
-    theme_bw()
-preplot1
-
-preplot2<-ggplot(data = data.dyad, aes(x= Parasite, y= Immune))+
-    geom_point(size= 1.2, alpha= .8, position= "jitter")+
-    geom_smooth(method= lm, se= FALSE, col= "red", size= .8)+
-    theme_bw()
-preplot2
-
-
 #### model
-modeli<-brm(Microbiome_similarity~1+ spatial+locality+BMI+genetic_dist+Parasite+ Immune*hi_dist+
+modeli<-brm(Microbiome_similarity~1+ spatial+locality+BMI+genetic_dist*hi+ Immune+year+sex+
                 (1|mm(IDA,IDB)),
                 data = data.dyad,
                 family= "gaussian",
                 warmup = 1000, iter = 3000,
-                cores = 50, chains = 10,
+                cores = 20, chains = 4,
                 inits=0)
+
+modeliF<-brm(FungiJac~1+ spatial+locality+ Immune+
+                (1|mm(IDA,IDB)),
+                data = data.dyad,
+                family= "gaussian",
+                warmup = 1000, iter = 3000,
+                cores = 20, chains = 4,
+                inits=0)
+
+modeliP<-brm(ParasiteJac~1+ spatial+locality+ Immune+
+                (1|mm(IDA,IDB)),
+                data = data.dyad,
+                family= "gaussian",
+                warmup = 1000, iter = 3000,
+                cores = 20, chains = 4,
+                inits=0)
+modeliP2<-brm(ParasiteChi~1+ spatial+locality+ Immune+
+                (1|mm(IDA,IDB)),
+                data = data.dyad,
+                family= "gaussian",
+                warmup = 1000, iter = 3000,
+                cores = 20, chains = 4,
+                inits=0)
+
+modeliF
+
 saveRDS(modeli, "tmp/BRMmodeli.rds")
+
+modeli.c<-brm(Microbiome_chi~1+ spatial+locality+BMI+genetic_dist*hi+ Immune+year+sex+
+                (1|mm(IDA,IDB)),
+                data = data.dyad,
+                family= "gaussian",
+                warmup = 1000, iter = 3000,
+                cores = 20, chains = 4,
+                inits=0)
+saveRDS(modeli.c, "tmp/BRMmodeli_chi.rds")
+
+modeli.c
+
+modeli
+
 modeli <- readRDS("tmp/BRMmodeli.rds")
 
-conditional_effects(modeli)
-
-
-modelimm<-brm(Microbiome_similarity~1+ spatial+locality+BMI+genetic_dist+Parasite+ Immune+
+modelimm<-brm(Immune~1+ BMI+genetic_dist+hi+Microbiome_similarity+
                 (1|mm(IDA,IDB)),
                 data = data.dyad,
                 family= "gaussian",
                 warmup = 1000, iter = 3000,
-                cores = 50, chains = 10,
-                inits=0)
+                cores = 50, chains = 4,
+              inits=0)
+
+
+modelimm2<-brm(Immune~1+ BMI+genetic_dist+hi+FungiJac+ParasiteJac+
+                (1|mm(IDA,IDB)),
+                data = data.dyad,
+                family= "gaussian",
+                warmup = 1000, iter = 3000,
+                cores = 50, chains = 4,
+              inits=0)
+
+modelimm2
+
+modelimm.c<-brm(Immune~1+ BMI+genetic_dist+hi+Microbiome_chi+
+                (1|mm(IDA,IDB)),
+                data = data.dyad,
+                family= "gaussian",
+                warmup = 1000, iter = 3000,
+                cores = 50, chains = 4,
+              inits=0)
+
+modelimm.c <- brm(Immune~1+ BMI+genetic_dist+hi+F+
+                (1|mm(IDA,IDB)),
+                data = data.dyad,
+                family= "gaussian",
+                warmup = 1000, iter = 3000,
+                cores = 50, chains = 4,
+              inits=0)
+
+
+
+
+
+modelimm <- add_criterion(modelimm, "loo")
 saveRDS(modelimm, "tmp/BRMmodelimm.rds")
-modelimm <- readRDS("tmp/BRMmodelimm.rds")
+#
+#modelimm <- readRDS("tmp/BRMmodelimm.rds")
+#
+modelimmHI<-brm(Immune~1+ BMI+HI_dist+hi+Microbiome_similarity+
+                (1|mm(IDA,IDB)),
+                data = data.dyad,
+                family= "gaussian",
+                warmup = 1000, iter = 3000,
+                cores = 50, chains = 4,
+                inits=0)
+modelimmHI <- add_criterion(modelimmHI, "loo")
+saveRDS(modelimmHI, "tmp/BRMmodelimmHI.rds")
+
+modelimmHI <- readRDS("tmp/BRMmodelimmHI.rds")
+
+modeli <- readRDS("tmp/BRMmodeli.rds")
+
+modelimm <- add_criterion(modelimm, "loo")
+modelimmHI <- add_criterion(modelimmHI, "loo")
+loo_compare(modelimm, modelimmHI)
+
+modelimmHI
+
+modelimm2<-brm(Immune~1+ BMI+genetic_dist+hi+
+                (1|mm(IDA,IDB)),
+                data = data.dyad,
+                family= "gaussian",
+                warmup = 1000, iter = 3000,
+                cores = 50, chains = 4,
+                inits=0)
+
+
+add_criterion(modelimm2, "loo")
+
+
+modelimmHI
+
+modelimm2
+
+modelimm_transformed <- ggs(modelimm)
+
+conditional_effects(modelimm)
+
+mcmc_plot(modelimm,
+                type = "intervals",
+                prob = 0.95,
+                pars= rownames(fixef(modelimm))[2:nrow(fixef(modelimm))])
+
+
+loo_compare(modelimmHI, modelimm)
+
+
+
 
 modelimm
 
@@ -246,6 +417,8 @@ model_i <- readRDS("tmp/BRMmodel_i.rds")
 #                inits=0)
 #saveRDS(model_ii, "tmp/BRMmodel_ii.rds")
 model_ii <- readRDS("tmp/BRMmodel_ii.rds")
+
+
 
 modeli
 

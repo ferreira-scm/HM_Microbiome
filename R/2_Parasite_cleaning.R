@@ -7,10 +7,10 @@ library(phangorn)
 library(ShortRead)
 library(dada2)
 library(dplyr)
-#### In this script we clean up parasite ASVs by individual acessing if each parasite genus 
-# likely has several species
-# we do this by looking at co-occurrence correlation networks per genus and see if the ASVs (that come from different amplicons) make a hairball structure, or a modular network. If it's modular, then likely ASV's here represent different species and we need to investigate further with phylogenetic analysis. 
-#
+#### In this script we clean up parasite ASVs by individual acessing if each parasite genus likely has several species
+# we do this by looking at co-occurrence correlation networks per genus and see if the ASVs (that come from different amplicons) make a hairball structure, suggesting ASVs are from the same taxa or a modular network. If it's modular, then likely ASV's here represent different species and we need to investigate further with phylogenetic analysis. 
+
+# there's evidence of 2 different taxa annotated as oxyurida. Probably Apiculuris and Syphacia
 ############# We need to distinguis between Oxyurida ASVs
 ## create reference sequences for Syhacia and Apiculuris and align them to ASV
 Oxy <- subset_taxa(PS.TSS, Genus%in%"Oxyurida")
@@ -200,8 +200,8 @@ PS.TSS@sam_data$Co_infb[as.numeric(PS.TSS@sam_data$Co_infb)>2] <- 2
 PS.TSS@sam_data$Co_inf <- as.factor(PS.TSS@sam_data$Co_inf)
 
 #hybridicity
-PS.TSS@sam_data$hi <- abs(PS.TSS@sam_data$HI-0.5)
-fPS@sam_data$hi <- abs(fPS@sam_data$HI-0.5)
+PS.TSS@sam_data$hi <- -abs(PS.TSS@sam_data$HI-0.5)
+fPS@sam_data$hi <- -abs(fPS@sam_data$HI-0.5)
 
 #### let's look at specific co-infections. Which are the most common?
 #PS.T@sam_data$Co_inf

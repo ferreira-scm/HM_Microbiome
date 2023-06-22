@@ -1,11 +1,10 @@
-library(Hmsc)
+#library(Hmsc) # this is too slow, we don't use
 library(snow)
 library(corrplot)
 library(metagMisc)
 library(sjSDM)
 
 #install_sjSDM()
-
 
 PS.TSS <- readRDS("tmp/PS.TSS_filtered.rds")
 PS.TSS <- phyloseq_standardize_otu_abundance(PS.TSS, method="pa")
@@ -67,17 +66,16 @@ studyDesign$Year <- as.factor(studyDesign$Year)
 studyDesign$Locality <- as.factor(studyDesign$Locality)
 
 rL1=HmscRandomLevel(sData=xy)
-
 rL2=HmscRandomLevel(units=studyDesign$Year)
 
 ranlevels=list(Locality=rL1, Year=rL2)
 ranlevels
 
-jModel <- Hmsc(Y=Y, XData=X,
-               XFormula=XFormula,
-               studyDesign=studyDesign,
-               ranLevels=ranlevels,
-               distr="probit")
+#jModel <- Hmsc(Y=Y, XData=X,
+#               XFormula=XFormula,
+#               studyDesign=studyDesign,
+#               ranLevels=ranlevels,
+#               distr="probit")
 
 ## this takes too long... :(
 #thin=50
@@ -114,16 +112,34 @@ jModel <- Hmsc(Y=Y, XData=X,
 ############# Let's try a faster approach
 
 #### to do: let's tune this!!!! 40 random steps with leave-one-out cross validation(LOOCV), 150 iterations and learning rate of 0.01
-
-#sjSDM_cv()
+# let's scale the host factors
+X_scaled <- X
+X_scaled$BMI <- scale(X$BMI)
+X_scaled$hi <- scale(X$hi)
 
 colnames(xy) <- c("XX", "YY")
-
 SPeigen <- generateSpatialEV(xy)
+
+tune <- sjSDM_cv(Y=Y, env=X_scaled, spatial=linear(SPeigen, ~0+.), 
+                 learning_rate = 0.001, iter = 150L, CV = nrow(Y),
+                 n_cores = 60, tune_steps = 40,
+#                 lambda_cov =  2.0^seq(-9, -2, length.out = 10),
+#                 lambda_coef = 0.1,
+#                 alpha_cov = seq(0, 1, 0.05),
+#                 alpha_coef = 0.5,
+                 sampling = 1000L,
+                 biotic =  bioticStruct(df=dim(Y)[2]),
+#                 step_size = 5L,
+#                 link = "logit",
+                 blocks = 3L
+                 )
+
+
 
 #model1=sjSDM(Y=Y, env=linear(X, ~.), spatial=linear(SPeigen, ~0+.), iter=100L, se=TRUE)
 
-saveRDS(model1, "tmp/sjSDM_model1.rds")
+#saveRDS(model1, "tmp/sjSDM_model1.rds")
+model1 <- readRDS("tmp/sjSDM_model1.rds")
 
 Rsquared(model1)
 
