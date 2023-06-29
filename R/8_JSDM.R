@@ -2,6 +2,7 @@
 library(snow)
 library(corrplot)
 library(metagMisc)
+
 library(sjSDM)
 
 #install_sjSDM()
@@ -18,8 +19,8 @@ PS.TSS <- phyloseq_standardize_otu_abundance(PS.TSS, method="pa")
 metadata <- as.data.frame(PS.TSS@sam_data)
 class(metadata) <- "data.frame"
 
-X=metadata[,c("hi", "Sex", "BMI")]
-XFormula <- ~hi+Sex+BMI
+X=metadata[,c("hi", "Sex", "BMI", "HI")]
+XFormula <- ~hi+Sex+BMI+HI
 
 # Species occurrence box
 Y <- as.matrix(PS.TSS@otu_table)
@@ -121,8 +122,8 @@ colnames(xy) <- c("XX", "YY")
 SPeigen <- generateSpatialEV(xy)
 
 tune <- sjSDM_cv(Y=Y, env=X_scaled, spatial=linear(SPeigen, ~0+.), 
-                 learning_rate = 0.001, iter = 150L, CV = nrow(Y),
-                 n_cores = 60, tune_steps = 40,
+                 learning_rate = 0.1, iter = 150L, CV = nrow(Y),
+                 n_cores = 80, tune_steps = 10,
 #                 lambda_cov =  2.0^seq(-9, -2, length.out = 10),
 #                 lambda_coef = 0.1,
 #                 alpha_cov = seq(0, 1, 0.05),

@@ -518,132 +518,67 @@ model1_bac <- readRDS("tmp/BRMmodel1_bac.rds")
 
 para <- summary(model1_para)$fixed
 
-resdf.fun<- function(model1_para, name, ASV){
+summary(model1)$fixed
+
+rep("test", 10)
+
+para$'l-95% CI'
+
+res.fun <- function(model1_para, name, ASV){
     para <- summary(model1_para)$fixed
-    data.frame(Domain=name,
-                                            ASVs=ASV,
-                genetic_dist_Estimate=para[rownames(para)=="genetic_dist", "Estimate"],
-                     genetic_dist_lCI=para[rownames(para)=="genetic_dist", "l-95% CI"],
-                genetic_dist_uCI=para[rownames(para)=="genetic_dist", "u-95% CI"],
-                spatial_Estimate=para$Estimate[rownames(para)=="spatial"],
-                     spatial_lCI=para[rownames(para)=="spatial", "l-95% CI"],
-                     spatial_uCI=para[rownames(para)=="spatial", "u-95% CI"],
-                                locality_Estimate=para$Estimate[rownames(para)=="locality1"],
-                     locality_lCI=para[rownames(para)=="locality1", "l-95% CI"],
-                     locality_uCI=para[rownames(para)=="locality1", "u-95% CI"],
-                                hi_Estimate=para$Estimate[rownames(para)=="hi"],
-                     hi_lCI=para[rownames(para)=="hi", "l-95% CI"],
-                     hi_uCI=para[rownames(para)=="hi", "u-95% CI"],
-                year_Estimate=para$Estimate[rownames(para)=="year"],
-                     year_lCI=para[rownames(para)=="year", "l-95% CI"],
-                     year_uCI=para[rownames(para)=="year", "u-95% CI"],
-                BMI_Estimate=para$Estimate[rownames(para)=="BMI"],
-                     BMI_lCI=para[rownames(para)=="BMI", "l-95% CI"],
-               BMI_uCI=para[rownames(para)=="BMI", "u-95% CI"],
-                               sexFM_Estimate=para$Estimate[rownames(para)=="sexFM"],
-                     sexFM_lCI=para[rownames(para)=="sexFM", "l-95% CI"],
-                     sexFM_uCI=para[rownames(para)=="sexFM", "u-95% CI"],
-                               sexFF_Estimate=para$Estimate[rownames(para)=="sexFF"],
-                     sexFF_lCI=para[rownames(para)=="sexFF", "l-95% CI"],
-                     sexFF_uCI=para[rownames(para)=="sexFF", "u-95% CI"],
-                               gen_hi_Estimate=para$Estimate[rownames(para)=="genetic_dist:hi"],
-                     gen_hi_lCI=para[rownames(para)=="genetic_dist:hi", "l-95% CI"],
-                     gen_hi_uCI=para[rownames(para)=="genetic_dist:hi", "u-95% CI"]
-                )
-}
+    data.frame(Domain=rep(name, 10),
+           ASVs=rep(ASV,10),
+           Effect=rownames(para),
+           Estimate=para$Estimate,
+           lCI=para$'l-95% CI',
+           uCI=para$'u-95% CI')
+}           
+           
+res <- res.fun(model1_para, "Parasite", 11)
+res <- rbind(res, res.fun(model1_bac, "Bacteria", 383))
+res <- rbind(res, res.fun(model1_diet, "Diet", 45))
+res <- rbind(res, res.fun(model1_Fungi, "Fungi", 65))
+res <- rbind(res, res.fun(model1, "Full model", 588))
 
+res$Domain[res$Domain=="Diet"] <- "Plants"
 
-res.df <-resdf.fun(model1_para, "Parasite", 11)
-res.df <- rbind(res.df, resdf.fun(model1_bac, "Bacteria", 383))
-res.df <- rbind(res.df, resdf.fun(model1_diet, "Diet", 45))
-res.df <- rbind(res.df, resdf.fun(model1_Fungi, "Fungi", 65))
-res.df <- rbind(res.df, resdf.fun(model1, "Full model", 588))
+res$Domain[res$Domain=="Parasite"] <- "Parasites"
 
-res.df$Domain[res.df$Domain=="Diet"] <- "Plants"
-
-res.df$Domain[res.df$Domain=="Parasite"] <- "Parasites"
-
-res.df$Domain <- factor(res.df$Domain, levels=c( "Bacteria", "Parasites", "Fungi", "Plants", "Full model"))
+res$Domain <- factor(res$Domain, levels=c( "Bacteria", "Parasites", "Fungi", "Plants", "Full model"))
 
 library(scales)
+#coul=c("#154360", "#b71c1c", "#512e5f", "#0e6251")
+#coul=c("#edca82", "#097770", "#e0cdbe", "#a9c0a6")
+coul=c("#F8B195","#F67280", "#6C5B7B", "#355C7D")
 
-show_col(coul)
+#Spatial, Locality, genetic, hi
 
-coul=c("#154360", "#b71c1c", "#512e5f", "#0e6251")
+res <- res[res$Effect%in%c("genetic_dist", "hi", "spatial", "locality1"),]
 
-gen <- ggplot(res.df[!res.df$Domain=="Full model",], aes(x=genetic_dist_Estimate, y=Domain, colour=Domain))+
-    geom_rect(aes(xmin=res.df$genetic_dist_lCI[res.df$Domain=="Full model"], xmax=res.df$genetic_dist_uCI[res.df$Domain=="Full model"], ymin=-Inf, ymax=Inf),
-              fill= "#7fb3d5", colour="white", alpha=0.5)+
-    geom_errorbar(aes(xmin=genetic_dist_lCI, xmax=genetic_dist_uCI, colour=Domain), size=1, width=0.4)+
-    geom_point()+
-    geom_vline(xintercept=res.df$genetic_dist_Estimate[res.df$Domain=="Full model"], colour="black", linewidth=1.5)+
+re.plot <- ggplot(res, aes(x = Estimate, y = Effect, fill = Effect)) +
+    geom_errorbar(aes(xmin=lCI, xmax=uCI, colour=Effect), size=1, width=0.4)+
+        geom_point(shape = 21, size=3) +
+    scale_fill_manual(values = coul) +
+    scale_colour_manual(values = coul) +
+            xlab("Parameter estimate") +
+    ylab("") +
+    scale_y_discrete(labels = c("Genetic distances", "Hybridicity distances", "Shared locality", "Spatial distances")) +
     geom_vline(xintercept=0, linetype="dashed", linewidth=1)+
-    scale_x_reverse()+
-    scale_colour_manual(values=coul)+
-#    scale_discrete_vi()+
-    labs(x="Posterior estimate of genetic distance", y="")+
-    theme_bw(base_size=10)+
-    theme(legend.position = "none",
-          panel.grid.major.x = element_blank(),
-          panel.grid.minor.x = element_blank())
-gen
+    facet_grid(Domain ~ ., scales = "free_y", space = "free_y")+
+    theme_classic(base_size=12)+
+    theme(
+        strip.text = element_text(face = "bold"),
+        panel.background = element_rect(fill = "white", color = NA),
+        panel.grid = element_blank(),
+        strip.background = element_rect(fill = "white", color = "black"),
+        panel.border = element_rect(color = "black", fill = NA),
+    #    axis.line = element_line(color = "black"),
+    #    plot.title = element_text(size = 12, face = "bold"),
+        legend.position="none")
 
-spa <- ggplot(res.df[!res.df$Domain=="Full model",], aes(x=spatial_Estimate, y=Domain, colour=Domain))+
-    geom_rect(aes(xmin=res.df$spatial_lCI[res.df$Domain=="Full model"], xmax=res.df$spatial_uCI[res.df$Domain=="Full model"], ymin=-Inf, ymax=Inf),
-              fill="#f1c40f", colour="white", alpha=0.5)+
-    geom_errorbar(aes(xmin=spatial_lCI, xmax=spatial_uCI, colour=Domain), size=1, width=0.4)+
-    geom_point()+
-    geom_vline(xintercept=res.df$spatial_Estimate[res.df$Domain=="Full model"], colour="black", linewidth=1.5)+
-    geom_vline(xintercept=0, linetype="dashed", linewidth=1)+
-    scale_x_reverse()+
-   scale_colour_manual(values=coul)+
-#    scale_discrete_vi()+
-    labs(x="Posterior estimate of spatial distance", y="")+
-    theme_bw(base_size=10)+
-    theme(legend.position = "none",
-          panel.grid.major.x = element_blank(),
-          panel.grid.minor.x = element_blank())
-spa
+re.plot
 
-lo <- ggplot(res.df[!res.df$Domain=="Full model",], aes(x=locality_Estimate, y=Domain, colour=Domain))+
-    geom_rect(aes(xmin=res.df$locality_lCI[res.df$Domain=="Full model"], xmax=res.df$locality_uCI[res.df$Domain=="Full model"], ymin=-Inf, ymax=Inf),
-              fill="#ba4a00", colour="white", alpha=0.5)+
-    geom_errorbar(aes(xmin=locality_lCI, xmax=locality_uCI, colour=Domain), size=1, width=0.4)+
-    geom_point()+
-    geom_vline(xintercept=res.df$locality_Estimate[res.df$Domain=="Full model"], colour="black", linewidth=1.5)+
-    geom_vline(xintercept=0, linetype="dashed", linewidth=1)+
-#    scale_x_reverse()+
-    scale_colour_manual(values=coul)+
-#    scale_discrete_vi()+
-    labs(x="Posterior estimate of shared locality", y="")+
-    theme_bw(base_size=10)+
-    theme(legend.position = "none",
-          panel.grid.major.x = element_blank(),
-          panel.grid.minor.x = element_blank())
-
-hi <- ggplot(res.df[!res.df$Domain=="Full model",], aes(x=hi_Estimate, y=Domain, colour=Domain))+
-    geom_rect(aes(xmin=res.df$hi_lCI[res.df$Domain=="Full model"], xmax=res.df$hi_uCI[res.df$Domain=="Full model"], ymin=-Inf, ymax=Inf),
-              fill="#abebc6", colour="white", alpha=0.5)+
-    geom_errorbar(aes(xmin=hi_lCI, xmax=hi_uCI, colour=Domain), size=1, width=0.4)+
-    geom_point()+
-    geom_vline(xintercept=res.df$hi_Estimate[res.df$Domain=="Full model"], colour="black", linewidth=1.5)+
-    geom_vline(xintercept=0, linetype="dashed", linewidth=1)+
-#    scale_x_reverse()+
-   scale_colour_manual(values=coul)+
-#    scale_discrete_vi()+
-    labs(x="Posterior estimate of hybridicity distance", y="")+
-    theme_bw(base_size=10)+
-    theme(legend.position = "none",
-          panel.grid.major.x = element_blank(),
-          panel.grid.minor.x = element_blank())
-#hi
-
-FigX <- readRDS("tmp/Fig2a.rds")
-
-figure3 <- plot_grid(hi, gen, spa, lo, labels=c("b", "c", "d", "e"), nrow=2)
-figure3
-Fig3 <- plot_grid(FigX, figure3, labels=c("a", ""), nrow=2)
-ggsave("fig/figure3.pdf", Fig3, width=180, height=150, units="mm", dpi=300)
+ggsave("fig/figure3.pdf", re.plot, width=150, height=180, units="mm", dpi=300)
 
 ############################################################################################
 ######## Decomposing the Fungi model

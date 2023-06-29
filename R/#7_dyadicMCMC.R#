@@ -278,6 +278,10 @@ library(scico)
 
 #install.packages('scico')
 
+cor.test(data.dyad$genetic_dist, data.dyad$hi, method="spearman")
+
+cor.test(data.dyad$genetic_dist, data.dyad$HI, method="spearman")
+
 ## now let's take a look at correlation trends
 hi_gen <-ggplot(data = data.dyad, aes(x= genetic_dist, y= hi))+
                                         #    geom_poit(size= 1.2, alpha= .1, position= "jitter")+
@@ -380,7 +384,7 @@ ggsave("fig/Figure1.pdf", Fig1, width=400, height=150, units="mm", dpi=300)
 ggplot(data=metadt, aes(x=HI, y=hi))+
     geom_point()
 
-#bayes_R2(model1, digits=2)
+
 
 bayes_R2(model1_chi, digits=2)
 
@@ -426,51 +430,34 @@ loo_compare(model1, model1_HI)
 model1
 
 
-####
-#model2<-brm(Microbiome_similarity~1+ spatial+genetic_dist*hi+year+BMI+sex+
-#                (1|mm(IDA,IDB))+(1|locality),
-#                data = data.dyad,
-#                family= "gaussian",
-#                warmup = 1000, iter = 3000,
-#                cores = 20, chains = 4,
-#                inits=0)
-#saveRDS(model2, "tmp/BRMmodel2.rds")
-#model2 <- readRDS("tmp/BRMmodel2.rds")
-
-#model3<-brm(Microbiome_similarity~1+ spatial+locality*genetic_dist+year+
+#model1_chi<-brm(Microbiome_similarity_chi~1+ spatial+locality+genetic_dist*hi+year+BMI+sex+
 #                (1|mm(IDA,IDB)),
 #                data = data.dyad,
 #                family= "gaussian",
 #                warmup = 1000, iter = 3000,
-#                cores = 50, chains = 10,
-#                inits=0)
-#saveRDS(model3, "tmp/BRMmodel3.rds")
-#model3 <- readRDS("tmp/BRMmodel3.rds")
+#                cores = 20, chains = 4,
+#               inits=0)
 
-model1_chi<-brm(Microbiome_similarity_chi~1+ spatial+locality+genetic_dist*hi+year+BMI+sex+
-                (1|mm(IDA,IDB)),
-                data = data.dyad,
-                family= "gaussian",
-                warmup = 1000, iter = 3000,
-                cores = 20, chains = 4,
-               inits=0)
-
+model1_chi <- add_criterion(model1_chi, "loo")
 saveRDS(model1_chi, "tmp/BRMmodel1_chi.rds")
 
 model1_chi <- readRDS("tmp/BRMmodel1_chi.rds")
 
-
-#model3
-
-summary(model1)
-
 #conditional_effects(model3)
+
+bayes_R2(model1, digits=2)
+bayes_R2(model1_chi, digits=2)
+
+loo(model1, model1_chi)
+
+loo(model1_chi)
+
+loo(model1)
 
 library(tidybayes)
 
 #brms::posterior_epred(model1)
 
-head(data.dyad)
 library(microshades)
 
 library(cowplot)

@@ -4,7 +4,9 @@ library(data.table)
 library(purrr)
 library(ggplot2)
 library(ggpubr)
-#BiocManager::install("MOFA2")
+
+#                                        BiocManager::install("MOFA2", force=TRUE)
+
 library(MOFA2)
 
 
@@ -13,23 +15,18 @@ library(MOFA2)
 
 PS.TSS <- readRDS("tmp/PS.TSS_filtered.rds")
 
-PS <- subset_taxa(PS.TSS, !Genus %in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas"))
+PS.TSS@otu_table <- decostand(PS.TSS@otu_table, method="clr", pseudocount=1)
 
-
-
-
-get_taxa_unique(PS.TSS, "Kingdom")
-
-
-## ajusting Domain name
-PS.TSS@tax_table[which(PS.TSS@tax_table[,6]%in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas")),1] <- "Parasite"
-
-PS.TSS@tax_table[which(PS.TSS@tax_table[,1]%in%c("Bacteria", "Archaea")),1] <- "Prokaryote"
-
-get_taxa_unique(PS.TSS, "Kingdom")
-
+tax <- as.data.frame(PS.TSS@tax_table)
+tax$Kingdom[tax$Phylum%in%c("Mucoromycota", "Ascomycota", "Basidiomycota")] <- "Fungi"
+tax$Kingdom[tax$Phylum%in%c("Anthophyta", "Phragmoplastophyta", "Charophyta", "Ochrophyta")] <- "Plants"
+tax$Kingdom[tax$Genus%in%c("Eimeria", "Cryptosporidium", "Syphacia", "Aspiculuris", "Ascaridida", "Mastophorus","Trichuris", "Hymenolepis", "Tritrichomonas")] <- "Parasite"
+tax$Kingdom[tax$Kingdom%in%"Bacteria"] <- "Bacteria"
+tax$Kingdom[!tax$Kingdom%in%c("Bacteria", "Parasite", "Plants", "Fungi")] <- "Other"
+tax_table(PS.TSS) <- tax_table(as.matrix(tax))
 taxa_names(PS.TSS) <- paste("ASV", 1:ntaxa(PS.TSS), PS.TSS@tax_table[,6], sep="_")
 
+get_taxa_unique(PS.TSS, "Kingdom")
 df <- psmelt(PS.TSS)
 
 df1 <- df[,c("Sample", "OTU", "Abundance", "Kingdom")]
@@ -48,15 +45,13 @@ ggplot(df1, aes(x=value, colour=view))+
 
 metadata <- sample_data(PS.TSS)
 
-keep <- c("Mouse_ID", "Sex", "Locality", "Year", "Co_infb", "hi", "BMI", "IFNy", "CXCR3", "IL.6", "IL.13", "IL1RN", "CASP1", "CXCL9", "IDO1", "IRGM1", "MPO", "MUC2", "MUC5AC", "MYD88", "NCR1", "PRF1", "RETNLB", "SOCS1", "TICAM1", "TNF")
+keep <- c("Mouse_ID", "Sex", "Locality", "Year", "hi", "HI", "BMI")
 
 metadata <- metadata[,keep]
 
 metadata$sample <- metadata$Mouse_ID
 
 metadata$Mouse_ID <- NULL
-
-immune <- c("IFNy", "CXCR3", "IL.6", "IL.13", "IL1RN", "CASP1", "CXCL9", "IDO1", "IRGM1", "MPO", "MUC2", "MUC5AC", "MYD88", "NCR1", "PRF1", "RETNLB", "SOCS1", "TICAM1", "TNF")
 
 mofa <- create_mofa(data=df1, groups=NULL, extract_metadata=FALSE)
 
@@ -92,14 +87,14 @@ plot_factor(mofa,
                )
 
 plot_factors(mofa,
-                     factors = c(1,4),
-             color_by = "Co_infb",
+                     factors = c(1,2),
+             color_by = "hi",
                      dot_size = 4
                      ) #+ guides(fill="none")
 
 plot_factor(mofa,
                factor = 1,
-               color_by = "Co_infb",
+               color_by = "hi",
                dot_size = 4,
                dodge = TRUE,
                stroke = 0.4,
@@ -110,32 +105,9 @@ plot_factor(mofa,
             axis.text.x = element_blank(),
             axis.ticks.x = element_blank()
               )
-
-plot_factor(mofa,
-               factor = 4,
-               color_by = "Co_infb",
-               dot_size = 4,
-               dodge = TRUE,
-               stroke = 0.4,
-               add_violin = T,
-               add_boxplot = T
-               ) +
-        theme(
-            axis.text.x = element_blank(),
-            axis.ticks.x = element_blank()
-              )
-
-
-plot_factor(mofa,
-               factors = 1,
-               color_by = "Sex",
-               dodge = TRUE,
-               add_violin = TRUE
-               )
-
 
 plot_data_heatmap(mofa,
-                        view = "Eukarya",
+                        view = "Fungi",
                         factor = 1,
                   features = 25,
                   denoise=TRUE,
@@ -145,7 +117,7 @@ plot_data_heatmap(mofa,
                   )
 
 plot_data_heatmap(mofa,
-                        view = "Prokaryote",
+                        view = "Parasite",
                         factor = 1,
                   features = 25,
                   denoise=TRUE,
@@ -158,42 +130,23 @@ plot_data_heatmap(mofa,
 
 
 plot_top_weights(mofa,
-                       view = "Eukaryote",
-                       factor = 5,
+                       view = "Fungi",
+                       factor = 2,
                        nfeatures = 25,     # Top number of features to highlight
                        scale = T           # Scale weights from -1 to 1
                        )
 
 
-plot_top_weights(mofa,
-                       view = "Prokaryote",
-                       factor = 5,
-                       nfeatures = 25,     # Top number of features to highlight
-                       scale = T           # Scale weights from -1 to 1
-                       )
-
 plot_data_heatmap(mofa,
-                        factor = 1,
-                        view = "Eukarya",
+                        factor = 2,
+                        view = "Fungi",
                         features = 20,
                         denoise = TRUE,
                         cluster_rows = T, cluster_cols = F,
                         show_colnames = F, show_rownames = T,
-                        annotation_samples = "Co_infb",
+                        annotation_samples = "HI",
  #                       annotation_colors = list("Category"=category.colors),
                         annotation_legend = F,
                         scale = "row"
                         )
 
-plot_data_heatmap(mofa,
-                        factor = 1,
-                        view = "Prokaryote",
-                        features = 20,
-                        denoise = TRUE,
-                        cluster_rows = T, cluster_cols = F,
-                        show_colnames = F, show_rownames = T,
-                        annotation_samples = "BMI",
- #                       annotation_colors = list("Category"=category.colors),
-                        annotation_legend = F,
-                        scale = "row"
-                        )
