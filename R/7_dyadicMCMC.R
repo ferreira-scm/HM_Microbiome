@@ -35,6 +35,10 @@ library(RColorBrewer)
 library(gganimate)
 library(posterior)
 library(distributional)
+library(tidybayes)
+library(microshades)
+library(cowplot)
+library(ggpmisc)
 
 
 ### we don't include sex because it does not converge
@@ -272,11 +276,11 @@ data.dyad <- readRDS("tmp/data.dyad.RDS")
 
 ## now let's take a look at correlation trends
 
-library(ggpmisc)
-
-library(scico)
-
 #install.packages('scico')
+
+cor.test(data.dyad$genetic_dist, data.dyad$hi, method="spearman")
+
+cor.test(data.dyad$genetic_dist, data.dyad$HI, method="spearman")
 
 ## now let's take a look at correlation trends
 hi_gen <-ggplot(data = data.dyad, aes(x= genetic_dist, y= hi))+
@@ -377,23 +381,7 @@ Fig1 <- ggarrange(sampling, ggarrange(hi_Hindex, gen_HI, hi_HI, hi_gen, labels=c
 
 ggsave("fig/Figure1.pdf", Fig1, width=400, height=150, units="mm", dpi=300)
 
-ggplot(data=metadt, aes(x=HI, y=hi))+
-    geom_point()
-
-#bayes_R2(model1, digits=2)
-
-bayes_R2(model1_chi, digits=2)
-
-ggplot(data = data.dyad, aes(x=spatial , y= locality))+
-    geom_point(size= 1.2, alpha= .1, position= "jitter")+
-#    geom_smooth(method= lm, se= FALSE, col= "red", size= .8)+
-    theme_bw()
-
-
 ## Let's model
-names(data.dyad)
-
-#### This is our final model
 #model1<-brm(Microbiome_similarity~1+ spatial+locality+genetic_dist*hi+year+BMI+sex+
 #                (1|mm(IDA,IDB)),
 #                data = data.dyad,
@@ -403,10 +391,8 @@ names(data.dyad)
  #               inits=0)
 #model1 <- add_criterion(model1, "loo")
 #saveRDS(model1, "tmp/BRMmodel1.rds")
-
 model1 <- readRDS("tmp/BRMmodel1.rds")
 
-#### This is our final model
 model1_HI<-brm(Microbiome_similarity~1+ spatial+locality+HI*hi+year+BMI+sex+
                 (1|mm(IDA,IDB)),
                 data = data.dyad,
@@ -419,61 +405,33 @@ saveRDS(model1_HI, "tmp/BRMmodel1_HI.rds")
 
 model1_HI <- readRDS("tmp/BRMmodel1_HI.rds")
 
-model1_HI
-
 loo_compare(model1, model1_HI)
 
-model1
-
-
-####
-#model2<-brm(Microbiome_similarity~1+ spatial+genetic_dist*hi+year+BMI+sex+
-#                (1|mm(IDA,IDB))+(1|locality),
-#                data = data.dyad,
-#                family= "gaussian",
-#                warmup = 1000, iter = 3000,
-#                cores = 20, chains = 4,
-#                inits=0)
-#saveRDS(model2, "tmp/BRMmodel2.rds")
-#model2 <- readRDS("tmp/BRMmodel2.rds")
-
-#model3<-brm(Microbiome_similarity~1+ spatial+locality*genetic_dist+year+
+#model1_chi<-brm(Microbiome_similarity_chi~1+ spatial+locality+genetic_dist*hi+year+BMI+sex+
 #                (1|mm(IDA,IDB)),
 #                data = data.dyad,
 #                family= "gaussian",
 #                warmup = 1000, iter = 3000,
-#                cores = 50, chains = 10,
-#                inits=0)
-#saveRDS(model3, "tmp/BRMmodel3.rds")
-#model3 <- readRDS("tmp/BRMmodel3.rds")
+#                cores = 20, chains = 4,
+#               inits=0)
 
-model1_chi<-brm(Microbiome_similarity_chi~1+ spatial+locality+genetic_dist*hi+year+BMI+sex+
-                (1|mm(IDA,IDB)),
-                data = data.dyad,
-                family= "gaussian",
-                warmup = 1000, iter = 3000,
-                cores = 20, chains = 4,
-               inits=0)
-
-saveRDS(model1_chi, "tmp/BRMmodel1_chi.rds")
+#model1_chi <- add_criterion(model1_chi, "loo")
+#saveRDS(model1_chi, "tmp/BRMmodel1_chi.rds")
 
 model1_chi <- readRDS("tmp/BRMmodel1_chi.rds")
 
-
-#model3
-
-summary(model1)
-
 #conditional_effects(model3)
+bayes_R2(model1, digits=2)
+bayes_R2(model1_chi, digits=2)
 
-library(tidybayes)
+loo(model1, model1_chi)
+
+loo(model1_chi)
+
+loo(model1)
 
 #brms::posterior_epred(model1)
 
-head(data.dyad)
-library(microshades)
-
-library(cowplot)
 newdata <- data.frame(spatial=seq_range(data.dyad$spatial, n=51),
                       BMI=rep(median(data.dyad$BMI), n=51),
                       hi=rep(median(data.dyad$hi),n=51),
@@ -497,111 +455,6 @@ spatial_pred <- ggplot(data.dyad, aes(x=spatial, y=Microbiome_similarity))+
     theme_bw(base_size=12)
 
 spatial_pred
-
-newdata0 <- data.frame(genetic_dist=seq_range(data.dyad$genetic_dist, n=51),
-              BMI=rep(median(data.dyad$BMI), n=51),
-              year=rep(0, n=51),
-              hi=rep(0, n=51),
- #             hi=rep(median(data.dyad$hi), n=51),
-              locality=rep(0, n=51),
-              sex=rep("MM", 51),
-              IDA=rep("AA_0197", 51),
-              IDB=rep("AA_0089", 51),
-              spatial=rep(median(data.dyad$spatial)))
-pred.df <- add_epred_draws(newdata0, model1)
-
-gen_pred0 <- ggplot(data.dyad, aes(x=genetic_dist, y=Microbiome_similarity))+
-    geom_jitter(width=0.01, shape=21, size=1, colour="gray", alpha=0.7)+
-    stat_lineribbon(data=pred.df, aes(y = .epred),
-                    size=0.5, .width=c(.95, .8, .5), alpha=0.5) +
-    scale_fill_manual(values=microshades_palette("micro_purple"))+
-    ylab("Gut community similarity")+
-    xlab("Genetic distance")+
-    labs(fill="level:")+
-       ggtitle("hybridicity distance = 0")+
-    theme_bw(base_size=12)
-
-
-newdata1 <- data.frame(genetic_dist=seq_range(data.dyad$genetic_dist, n=51),
-              BMI=rep(median(data.dyad$BMI), n=51),
-              year=rep(0, n=51),
-              hi=rep(1, n=51),
-#              hi=rep(median(data.dyad$hi), n=51),
-              locality=rep(0, n=51),
-              sex=rep("MM", 51),
-              IDA=rep("AA_0197", 51),
-              IDB=rep("AA_0089", 51),
-              spatial=rep(median(data.dyad$spatial)))
-pred.df <- add_epred_draws(newdata1, model1)
-
-gen_pred1 <- ggplot(data.dyad, aes(x=genetic_dist, y=Microbiome_similarity))+
-    geom_jitter(width=0.01, shape=21, size=1, colour="gray", alpha=0.7)+
-    stat_lineribbon(data=pred.df, aes(y = .epred),
-                    size=0.5, .width=c(.95, .8, .5), alpha=0.5) +
-    scale_fill_manual(values=microshades_palette("micro_purple"))+
-    ylab("Gut community similarity")+
-    xlab("Genetic distance")+
-    labs(fill="level:")+
-    ggtitle("hybridicity distance = 1")+
-    theme_bw(base_size=12)
-
-newdatam <- data.frame(genetic_dist=seq_range(data.dyad$genetic_dist, n=51),
-              BMI=rep(median(data.dyad$BMI), n=51),
-              year=rep(0, n=51),
-#              hi=rep(0, n=51),
-              hi=rep(median(data.dyad$hi), n=51),
-              locality=rep(0, n=51),
-              sex=rep("MM", 51),
-              IDA=rep("AA_0197", 51),
-              IDB=rep("AA_0089", 51),
-              spatial=rep(median(data.dyad$spatial)))
-
-pred.df <- add_epred_draws(newdatam, model1)
-gen_predm <- ggplot(data.dyad, aes(x=genetic_dist, y=Microbiome_similarity))+
-    geom_jitter(width=0.01, shape=21, size=1, colour="gray", alpha=0.7)+
-    stat_lineribbon(data=pred.df, aes(y = .epred),
-                    size=0.5, .width=c(.95, .5), alpha=0.5) +
-    scale_fill_manual(values=microshades_palette("micro_purple"))+
-    ylab("Gut community similarity")+
-    xlab("Genetic distance")+
-            labs(fill="level:")+
-    theme_bw(base_size=12)
-
-
-gen_predm
-
-FigureSx <- plot_grid(gen_pred0, gen_pred1, labels="auto", nrow=1)
-
-fig2 <- plot_grid(spatial_pred, gen_predm, labels="auto", nrow=1)
-
-ggsave("fig/figure2.pdf", fig2, width=170, height=85, units="mm", dpi=300)
-
-
-#B. More flexible LINEPLOT in ggplot:
-resdf1<-summary(model1)$fixed
-resdf1<-as.data.frame(resdf1)
-resdf1<-resdf1[c("Estimate","l-95% CI","u-95% CI")]
-resdf1<-resdf1[2:nrow(resdf1),]
-resdf1$Predictor<-rownames(resdf1)
-colnames(resdf1)<-c("Estimate","lCI","uCI","Predictor")
-
-resdf1$Predictor <- c("Spatial distance", "Shared locality", "Genetic distance", "Hybridicity", "Temporal distance", "Body mass index distance", "Female-Male", "Female-Female", "Genetic * Hybridicity distance")# rename
-resdf1$Predictor<-factor(resdf1$Predictor)
-
-plot2<-ggplot(resdf1[resdf1$Predictor%in%c("Spatial distance", "Shared locality", "Genetic distance", "Hybridicity"),],aes(x=Estimate,y=Predictor,colour=Predictor))+
-                                        #    geom_linerange(aes(xmin = lCI, xmax = uCI),size=10)+
-    geom_errorbar(aes(xmin = lCI, xmax = uCI),size=1, width=0.4)+
-    geom_point(size=3)+
-    scale_colour_brewer(palette="Paired")+ 
-#    geom_point(pch="|", size=7,colour="black")+
-    theme_bw(base_size = 18)+
-    theme(legend.position='none')+
-    labs(x="Effect on the gut community similarity",y="")+
-    geom_vline(xintercept=0, linetype="dashed")
-
-plot2
-
-
 
 #MCMCglmm gaussian model
 #mcmcglmm_model<-MCMCglmm(Microbiome_similarity~1+spatial+locality+genetic_dist*hi+year+BMI+sex,
@@ -657,11 +510,8 @@ ggsave("fig/figureS_caterpillar.pdf", caterpillar, width=170, height=200, units=
 
 ## don't forget to subset here
 cat2 <- cat[cat$Iteration>1000,]
-
 cat2$Parameter <- droplevels(cat2$Parameter)
-
 cat2$Parameter <- factor(cat2$Parameter, levels=c("b_Intercept", "b_spatial", "b_locality1", "b_genetic_dist", "b_hi", "b_year", "b_BMI", "b_sexFM",  "b_sexFF", "b_genetic_dist:hi"))
-
 
 newname <- c("Intercept", "Spatial distance", "Shared locality", "Genetic distance", "Hybridicity distance", "Temporal distance", "Body mass index distance", "Female-Male", "Female-Female", "Genetic * Hybridicity distance")# rename"Spatial distance", "Shared locality", "Genetic distance", "Hybridicity distance", "Temporal distance", "Body mass index distance", "Female-Male", "Female-Female", "Genetic*hybridicity distance")
 name <- unique(cat2$Parameter)
@@ -671,29 +521,11 @@ for (i in 1:10){
 }
 
 cat2$Parameter[cat2$Parameter=="Genetic distance:hi"] <- "Genetic * Hybridicity distance"
-
-unique(cat2$Parameter)
-
-
-#c("Intercept", "Spatial distance", "Shared locality", "Genetic distance", "Hybridicity distance", "Temporal distance", "Body mass index distance", "Female-Male", "Female-Female", "Genetic*hybridicity distance")
-
-
-#cat2$Parameter <- factor(cat2$Parameter, levels=c("Intercept", "Spatial distance", "Shared locality", "Genetic distance", "Hybridicity distance", "Temporal distance", "Body mass index distance", "Female-Male", "Female-Female", "Genetic*hybridicity distance"))
-
-#cat2 <- cat2[!cat2$Parameter%in%c("Intercept", "Temporal distance", "Body mass index distance", "Female-Male", "Female-Female", "Genetic * Hybridicity distance"),]
-
 cat2 <- cat2[!cat2$Parameter%in%"Intercept",]
 
 cat2$Parameter <- factor(cat2$Parameter, levels=c("Temporal distance", "Body mass index distance", "Female-Male", "Female-Female", "Genetic * Hybridicity distance", "Spatial distance", "Shared locality", "Genetic distance", "Hybridicity distance"))
 
-unique(cat2$Parameter)
-
-#cat2$Parameter <- factor(cat2$Parameter, levels=c("Spatial distance", "Shared locality", "Genetic distance", "Hybridicity distance"))
-
-#colours <- c("#979a9a", "#979a9a","#d0d3d4","#d0d3d4","#d0d3d4","#f1c40f", "#ba4a00", "#7fb3d5", "#abebc6")
-
-colours <- c("#979a9a", "#979a9a","#d0d3d4","#d0d3d4","#d0d3d4","#CBCE91FF", "#EA738DFF","#00203FFF", "#ADEFD1FF")
-
+colours <- c("#979a9a", "#979a9a","#d0d3d4","#d0d3d4","#d0d3d4","#355C7D", "#6C5B7B","#F8B195", "#F67280")
 
 FigX <-    ggplot(cat2, aes(x = value, y=Parameter, fill=Parameter))+
     geom_density_ridges(rel_min_height = 0.005, scale=5, alpha=0.8)+
@@ -721,14 +553,13 @@ FigX <-    ggplot(cat2, aes(x = value, y=Parameter, fill=Parameter))+
         axis.line = element_line(colour = "black"),
         plot.title = element_text(size = 12, face = "bold")
           )
+
 FigX
 
-saveRDS(FigX, "tmp/Fig2a.rds")
+ggsave("fig/figureS1.pdf", FigX, width=180, height=180, units="mm", dpi=300)
 
 #mcmc_areas(posterior, pars=c("b_Intercept", "b_spatial", "b_locality1", "b_genetic_dist", "b_hi", "b_year", "b_BMI", "b_sexFM", "b_sexFF", "b_genetic_dist:hi"),
 #           prob=0.8)
-
-loo(model1)
 
 ###################
 
@@ -743,7 +574,6 @@ tax <- as.data.frame(PS.TSS@tax_table)
 
 tax_G<-as.data.frame(table(tax[,6]))
 genuses<- as.character(tax_G$Var1)
-
 genuses <- c("none", genuses)
 #genuses <- append('none', genuses)
 
@@ -754,11 +584,6 @@ cores <- 60
 
 key<-data.frame(ID=sample_data(PS.TSS)$Mouse_ID, Sample_name=sample_data(PS.TSS)$Mouse_ID)
 data.dyad_REAL <- readRDS("tmp/data.dyad.RDS")
-
-names(data.dyad_REAL)
-
-#summary(mcmcglmm_model)
-
 
 #start cluster
 dropRes_list<-list()
@@ -777,7 +602,6 @@ dropRes_list<-foreach(i = 1:length(genuses)) %dopar% {
     #Unravel dissimilarity matrices into vectors
     bray<-c(as.dist(BRAY.i))
     jac<-c(as.dist(JACM.i))
-
     #Make a new dyadic data frame from these vectors and order it to be in the same order as       the original dyadic data frame
     data.dyad.i<-data.frame(Jaccard=jac,BrayCurtis=bray)
     # extracting Sample_name-combinations of the matrix
@@ -791,31 +615,24 @@ dropRes_list<-foreach(i = 1:length(genuses)) %dopar% {
     # So we can add dyad name and each participant ID to dyadic dataframe
     data.dyad.i$Sample_A<-list$Var2
     data.dyad.i$Sample_B<-list$Var1
-
     # extracting combinations of individual IDs for each pair
     keyA<-key[,c("ID","Sample_name")]
     colnames(keyA)<-c("IDA","Sample_A")
     keyB<-key[,c("ID","Sample_name")]
     colnames(keyB)<-c("IDB","Sample_B")
-
     keyA<-keyA[match(data.dyad.i$Sample_A,keyA$Sample_A),]
     keyB<-keyB[match(data.dyad.i$Sample_B,keyB$Sample_B),]
-
     data.dyad.i$IDA<-keyA$IDA
     data.dyad.i$IDB<-keyB$IDB
-
     # Make sure you have no self comparisons in the data (This is the case by default here,       since we are using just one sample per individual)
     data.dyad.i<-data.dyad.i[which(data.dyad.i$IDA!=data.dyad.i$IDB),] #
-
     ### Combine new Jaccard variable with rest of dyadic data columns
     data.dyad<-data.dyad_REAL
     data.dyad$Microbiome_similarity<-data.dyad.i$Jaccard
-
     #factorize terms used for multimembership random structure and make sure levels are     same and in same order
     data.dyad$IDA<-as.factor(data.dyad$IDA)
     data.dyad$IDB<-as.factor(data.dyad$IDB)
     all(levels(data.dyad$IDA)==levels(data.dyad$IDB))#T
-
 # Scale all predictors not between 0-1 already to be between 0-1
     scalecols<-c("spatial","genetic_dist", "BMI", "year", "hi")
     range.use <- function(x,min.use,max.use){(x - min(x,na.rm=T))/(max(x,na.rm=T)-min(x,na.rm=T)) * (max.use - min.use) + min.use }
@@ -824,14 +641,12 @@ dropRes_list<-foreach(i = 1:length(genuses)) %dopar% {
     }
 #Transpose Jaccard dissimilarity to similarity
         data.dyad$Microbiome_similarity<-1-data.dyad$Microbiome_similarity
-    
 #The MCMCglmm model
 dropmodel<-MCMCglmm(Microbiome_similarity~1+spatial+locality+genetic_dist*hi+year+BMI+sex,
                             data=data.dyad,
                             family= "gaussian",
                             random =~ mm(IDA+IDB),
                             verbose=FALSE)
-
    ASVs_dropped.i<-nrow(tax_table(PS.TSS))-nrow(tax_table(mic.i))
    resdf.i<-data.frame(Genus_dropped=gen.i,
                       ASVs_dropped=ASVs_dropped.i,
@@ -859,6 +674,7 @@ dropmodel<-MCMCglmm(Microbiome_similarity~1+spatial+locality+genetic_dist*hi+yea
                       )
     return(resdf.i)
 }
+
 parallel::stopCluster(cl)
 saveRDS(dropRes_list,"tmp/dropRes_list.rds")
 
@@ -934,8 +750,6 @@ hi_CIbr_baseline<-dropResults[which(dropResults$Genus_dropped=="none"),]$hi_CIbr
 dropResults$hi_CIbr_increase<- dropResults$hi_CIbr-hi_CIbr_baseline
 
 tax <- tax[, c("Genus", "Phylum", "Kingdom")]
-
-
 tax <- unique(tax)
 
 plot_cor <- merge(dropResults, tax, by.x="Genus_dropped", by.y="Genus")
@@ -952,25 +766,24 @@ plot_cor$Group[plot_cor$Phylum %in% c("Mucoromycota", "Ascomycota", "Basidiomyco
 
 plot_cor$Group <- factor(plot_cor$Group, levels=c("Bacteria", "Parasite", "Fungi", "Plant", "Other"))
 
+
+#genetic, hi, loc, spa
+c("#F8B195","#F67280"/"f897a1", "#6C5B7B", "#355C7D")
+  #f37c4d,#f23b4e ,453a4f , #1e3346
+
 #coul=c("#236f9f", "#b71c1c", "#7d4793", "#009999", ) 
-coul=c("#CBCE91FF", "#EA738DFF","#00203FFF", "#ADEFD1FF")
+#coul=c("#CBCE91FF", "#EA738DFF","#00203FFF", "#ADEFD1FF", "#808080")
 
 #Spatial, Locality, genetic, hi
 
-unique(plot_cor[plot_cor$spatial_Estimate>-0.05,])
-
-
-# quick fix here
-plot_cor <- plot_cor[-192,]
-
 gen_spa <- ggplot(data=plot_cor, aes(x=genetic_dist_Estimate, y=spatial_Estimate, fill=Group))+
-    geom_rect(aes(xmin=dropResults$genetic_dist_lCI[1], xmax=dropResults$genetic_dist_uCI[1], ymin=-Inf, ymax=Inf), fill="#00203FFF", alpha=0.05)+
-        geom_rect(aes(ymin=dropResults$spatial_lCI[1], ymax=dropResults$spatial_uCI[1], xmin=-Inf, xmax=Inf), fill="#CBCE91FF", alpha=0.05)+
-    geom_errorbar(aes(xmin = genetic_dist_lCI, xmax = genetic_dist_uCI),size=1, alpha=1, colour="#7abdff")+
-    geom_errorbar(aes(ymin = spatial_lCI, ymax = spatial_uCI), colour="#909442", size=1, alpha=1)+
+    geom_rect(aes(xmin=dropResults$genetic_dist_lCI[1], xmax=dropResults$genetic_dist_uCI[1], ymin=-Inf, ymax=Inf), fill="#F8B195", alpha=0.05)+
+        geom_rect(aes(ymin=dropResults$spatial_lCI[1], ymax=dropResults$spatial_uCI[1], xmin=-Inf, xmax=Inf), fill="#355C7D", alpha=0.05)+
+    geom_errorbar(aes(xmin = genetic_dist_lCI, xmax = genetic_dist_uCI),size=1, alpha=1, colour="#f37c4d")+
+    geom_errorbar(aes(ymin = spatial_lCI, ymax = spatial_uCI), colour="#1e3346", size=1, alpha=1)+
 #    geom_point(shape=21, size=2, alpha=0.8)+
-    scale_fill_manual(values=coul)+
-    scale_color_manual(values=coul)+
+#    scale_fill_manual(values=coul)+
+#    scale_color_manual(values=coul)+
     scale_x_reverse()+
         scale_y_reverse()+
     labs(x="Posterior estimate of genetic distance", y="Posterior estimate of spatial distances")+  
@@ -983,13 +796,13 @@ gen_spa <- ggplot(data=plot_cor, aes(x=genetic_dist_Estimate, y=spatial_Estimate
 gen_spa
 
 gen_hi <- ggplot(data=plot_cor, aes(x=genetic_dist_Estimate, y=hi_Estimate, fill=Group))+
-    geom_rect(aes(xmin=dropResults$genetic_dist_lCI[1], xmax=dropResults$genetic_dist_uCI[1], ymin=-Inf, ymax=Inf), fill="#00203FFF", colour="white", alpha=0.05)+
-        geom_rect(aes(ymin=dropResults$hi_lCI[1], ymax=dropResults$hi_uCI[1], xmin=-Inf, xmax=Inf), fill="#ADEFD1FF", alpha=0.05)+
-    geom_errorbar(aes(xmin = genetic_dist_lCI, xmax = genetic_dist_uCI),size=0.8, alpha=1, colour="#7abdff")+
-    geom_errorbar(aes(ymin = hi_lCI, ymax = hi_uCI),size=0.8, alpha=1, colour="#ADEFD1FF")+
-    geom_point(shape=21, size=2, alpha=0.8)+
+    geom_rect(aes(xmin=dropResults$genetic_dist_lCI[1], xmax=dropResults$genetic_dist_uCI[1], ymin=-Inf, ymax=Inf), fill="#F8B195", colour="white", alpha=0.05)+
+        geom_rect(aes(ymin=dropResults$hi_lCI[1], ymax=dropResults$hi_uCI[1], xmin=-Inf, xmax=Inf), fill="#f897a1", alpha=0.05)+
+    geom_errorbar(aes(xmin = genetic_dist_lCI, xmax = genetic_dist_uCI),size=0.8, alpha=1, colour="#f37c4d")+
+    geom_errorbar(aes(ymin = hi_lCI, ymax = hi_uCI),size=0.8, alpha=1, colour="#f23b4e")+
+#    geom_point(shape=21, size=2, alpha=0.8)+
     scale_x_reverse()+
-    scale_fill_manual(values=coul)+
+#    scale_fill_manual(values=coul)+
     labs(x="Posterior estimate of genetic distance", y="Posterior estimate of hybridicity distance")+  
         geom_vline(xintercept=0, colour="firebrick", linetype="dashed", size=1)+
     geom_hline(yintercept=0, colour="firebrick", linetype="dashed", size=1)+
@@ -1000,12 +813,12 @@ gen_hi <- ggplot(data=plot_cor, aes(x=genetic_dist_Estimate, y=hi_Estimate, fill
 gen_hi
 
 gen_lo <- ggplot(data=plot_cor, aes(x=genetic_dist_Estimate, y=locality_Estimate, fill=Group))+
-    geom_rect(aes(xmin=dropResults$genetic_dist_lCI[1], xmax=dropResults$genetic_dist_uCI[1], ymin=-Inf, ymax=Inf), fill="#00203FFF", colour="white", alpha=0.05)+
-        geom_rect(aes(ymin=dropResults$locality_lCI[1], ymax=dropResults$locality_uCI[1], xmin=-Inf, xmax=Inf), fill="#EA738DFF", alpha=0.05)+
-    geom_errorbar(aes(xmin = genetic_dist_lCI, xmax = genetic_dist_uCI),size=0.8, alpha=1, colour="#7abdff")+
-    geom_errorbar(aes(ymin = locality_lCI, ymax = locality_uCI),size=0.8, alpha=1, colour="#EA738DFF")+
-    geom_point(shape=21, size=2, alpha=0.8)+
-    scale_fill_manual(values=coul)+
+    geom_rect(aes(xmin=dropResults$genetic_dist_lCI[1], xmax=dropResults$genetic_dist_uCI[1], ymin=-Inf, ymax=Inf), fill="#F8B195", colour="white", alpha=0.05)+
+        geom_rect(aes(ymin=dropResults$locality_lCI[1], ymax=dropResults$locality_uCI[1], xmin=-Inf, xmax=Inf), fill="#6C5B7B", alpha=0.05)+
+    geom_errorbar(aes(xmin = genetic_dist_lCI, xmax = genetic_dist_uCI),size=0.8, alpha=1, colour="#f37c4d")+
+    geom_errorbar(aes(ymin = locality_lCI, ymax = locality_uCI),size=0.8, alpha=1, colour="#453a4f")+
+#    geom_point(shape=21, size=2, alpha=0.8)+
+#    scale_fill_manual(values=coul)+
     scale_x_reverse()+
     labs(x="Posterior estimate of genetic distance", y="Posterior estimate of shared locality")+  
         geom_vline(xintercept=0, colour="firebrick", linetype="dashed", size=1)+
@@ -1018,13 +831,13 @@ gen_lo
 
 hi_spa <- ggplot(data=plot_cor, aes(x=hi_Estimate, y=spatial_Estimate, fill=Group))+
     geom_rect(aes(xmin=dropResults$hi_lCI[dropResults$Genus_dropped=="none"], xmax=dropResults$hi_uCI[dropResults$Genus_dropped=="none"], ymin=-Inf, ymax=Inf),
-              fill="#ADEFD1FF", alpha=0.05)+
-        geom_rect(aes(ymin=dropResults$spatial_lCI[1], ymax=dropResults$spatial_uCI[1], xmin=-Inf, xmax=Inf),
-              fill="#CBCE91FF", alpha=0.05)+
-    geom_errorbar(aes(xmin = hi_lCI, xmax = hi_uCI),size=0.8, alpha=1, colour="#ADEFD1FF")+
-    geom_errorbar(aes(ymin = spatial_lCI, ymax = spatial_uCI),size=0.8, alpha=1, colour="#CBCE91FF")+
-    geom_point(shape=21, size=2, alpha=0.8)+
-    scale_fill_manual(values=coul)+
+              fill="#f897a1", alpha=0.05)+
+    geom_rect(aes(ymin=dropResults$spatial_lCI[1], ymax=dropResults$spatial_uCI[1], xmin=-Inf, xmax=Inf),
+              fill="#355C7D", alpha=0.05)+
+    geom_errorbar(aes(xmin = hi_lCI, xmax = hi_uCI),size=0.8, alpha=1, colour="#f23b4e")+
+    geom_errorbar(aes(ymin = spatial_lCI, ymax = spatial_uCI),size=0.8, alpha=1, colour="#1e3346")+
+#    geom_point(shape=21, size=2, alpha=0.8)+
+#    scale_fill_manual(values=coul)+
     scale_y_reverse()+
     labs(x="Posterior estimate of hybridicity distance", y="Posterior estimate of spatial distance")+          geom_vline(xintercept=0, colour="firebrick", linetype="dashed", size=1)+
     geom_hline(yintercept=0, colour="firebrick", linetype="dashed", size=1)+
@@ -1032,16 +845,17 @@ hi_spa <- ggplot(data=plot_cor, aes(x=hi_Estimate, y=spatial_Estimate, fill=Grou
     theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
           panel.background = element_blank(), axis.line = element_line(colour = "black"),
           legend.position="none")
+hi_spa
 
 hi_lo <- ggplot(data=plot_cor, aes(x=hi_Estimate, y=locality_Estimate, fill=Group))+
     geom_rect(aes(xmin=dropResults$hi_lCI[dropResults$Genus_dropped=="none"], xmax=dropResults$hi_uCI[dropResults$Genus_dropped=="none"], ymin=-Inf, ymax=Inf),
-              fill="#ADEFD1FF", alpha=0.05)+
+              fill="#f897a1", alpha=0.05)+
         geom_rect(aes(ymin=dropResults$locality_lCI[1], ymax=dropResults$locality_uCI[1], xmin=-Inf, xmax=Inf),
-              fill="#EA738DFF", alpha=0.05)+
-    geom_errorbar(aes(xmin = hi_lCI, xmax = hi_uCI),size=0.8, alpha=1, colour="#ADEFD1FF")+
-    geom_errorbar(aes(ymin = locality_lCI, ymax = locality_uCI),size=0.8, alpha=1, colour="#EA738DFF")+
-    geom_point(shape=21, size=2, alpha=0.8)+
-    scale_fill_manual(values=coul)+
+              fill="#6C5B7B", alpha=0.05)+
+    geom_errorbar(aes(xmin = hi_lCI, xmax = hi_uCI),size=0.8, alpha=1, colour="#f23b4e")+
+    geom_errorbar(aes(ymin = locality_lCI, ymax = locality_uCI),size=0.8, alpha=1, colour="#453a4f")+
+#    geom_point(shape=21, size=2, alpha=0.8)+
+#    scale_fill_manual(values=coul)+
    labs(x="Posterior estimate of hybridicity distance", y="Posterior estimate of shared locality")+
         geom_vline(xintercept=0, colour="firebrick", linetype="dashed", size=1)+
     geom_hline(yintercept=0, colour="firebrick", linetype="dashed", size=1)+
@@ -1049,16 +863,17 @@ hi_lo <- ggplot(data=plot_cor, aes(x=hi_Estimate, y=locality_Estimate, fill=Grou
     theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
           panel.background = element_blank(), axis.line = element_line(colour = "black"),
           legend.position="none")
+hi_lo
 
 lo_spa <- ggplot(data=plot_cor, aes(x=locality_Estimate, y=spatial_Estimate, fill=Group))+
     geom_rect(aes(xmin=dropResults$locality_lCI[dropResults$Genus_dropped=="none"], xmax=dropResults$locality_uCI[dropResults$Genus_dropped=="none"], ymin=-Inf, ymax=Inf),
-              fill="#EA738DFF", alpha=0.05)+
+              fill="#6C5B7B", alpha=0.05)+
         geom_rect(aes(ymin=dropResults$spatial_lCI[1], ymax=dropResults$spatial_uCI[1], xmin=-Inf, xmax=Inf),
-              fill="#CBCE91FF", alpha=0.05)+
-    geom_errorbar(aes(xmin = locality_lCI, xmax = locality_uCI),size=0.8, alpha=1, colour="#EA738DFF")+
-    geom_errorbar(aes(ymin = spatial_lCI, ymax = spatial_uCI),size=0.8, alpha=1, colour="#CBCE91FF")+
-    geom_point(shape=21, size=2, alpha=0.8)+
-    scale_fill_manual(values=coul)+
+              fill="#355C7D", alpha=0.05)+
+    geom_errorbar(aes(xmin = locality_lCI, xmax = locality_uCI),size=0.8, alpha=1, colour="#453a4f")+
+    geom_errorbar(aes(ymin = spatial_lCI, ymax = spatial_uCI),size=0.8, alpha=1, colour="#1e3346")+
+ #   geom_point(shape=21, size=2, alpha=0.8)+
+ #   scale_fill_manual(values=coul)+
     scale_y_reverse()+
     labs(x="Posterior estimate of shared locality", y="Posterior estimate of spatial distance")+
         geom_vline(xintercept=0, colour="firebrick", linetype="dashed", size=1)+
@@ -1069,11 +884,11 @@ lo_spa <- ggplot(data=plot_cor, aes(x=locality_Estimate, y=spatial_Estimate, fil
           legend.position= "none")
 lo_spa
 
-legend <- get_legend(gen_hi+
-                     guides(fill=guide_legend(nrow=1, byrow=TRUE))+
-                                  theme(legend.position="top"))
+#legend <- get_legend(gen_hi+
+#                     guides(fill=guide_legend(nrow=1, byrow=TRUE))+
+#                                  theme(legend.position="top"))
 
 fig3 <-    plot_grid(gen_hi, lo_spa, gen_spa, gen_lo, hi_spa, hi_lo)
-Fig3 <- plot_grid(legend, fig3, ncol=1, rel_heights=c(0.1, 1))
+fig3
 
-ggsave("fig/figure3.pdf", Fig3, width=220, height=150, units="mm", dpi=300)
+ggsave("fig/figureS2.pdf", fig3, width=220, height=150, units="mm", dpi=300)
