@@ -577,7 +577,6 @@ re.plot <- ggplot(res, aes(x = Estimate, y = Effect, fill = Effect)) +
         legend.position="none")
 
 re.plot
-
 ggsave("fig/figure3.pdf", re.plot, width=150, height=180, units="mm", dpi=300)
 
 ############################################################################################

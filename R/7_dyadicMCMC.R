@@ -765,16 +765,13 @@ plot_cor$Group[plot_cor$Genus_dropped %in%c("Eimeria", "Cryptosporidium", "Sypha
 plot_cor$Group[plot_cor$Phylum %in% c("Mucoromycota", "Ascomycota", "Basidiomycota")] <- "Fungi"
 
 plot_cor$Group <- factor(plot_cor$Group, levels=c("Bacteria", "Parasite", "Fungi", "Plant", "Other"))
-
+#quick fix
+plot_cor$Phylum <- NULL
+plot_cor <- (unique(plot_cor))
 
 #genetic, hi, loc, spa
-c("#F8B195","#F67280"/"f897a1", "#6C5B7B", "#355C7D")
+#c("#F8B195","#F67280"/"f897a1", "#6C5B7B", "#355C7D")
   #f37c4d,#f23b4e ,453a4f , #1e3346
-
-#coul=c("#236f9f", "#b71c1c", "#7d4793", "#009999", ) 
-#coul=c("#CBCE91FF", "#EA738DFF","#00203FFF", "#ADEFD1FF", "#808080")
-
-#Spatial, Locality, genetic, hi
 
 gen_spa <- ggplot(data=plot_cor, aes(x=genetic_dist_Estimate, y=spatial_Estimate, fill=Group))+
     geom_rect(aes(xmin=dropResults$genetic_dist_lCI[1], xmax=dropResults$genetic_dist_uCI[1], ymin=-Inf, ymax=Inf), fill="#F8B195", alpha=0.05)+
@@ -789,7 +786,7 @@ gen_spa <- ggplot(data=plot_cor, aes(x=genetic_dist_Estimate, y=spatial_Estimate
     labs(x="Posterior estimate of genetic distance", y="Posterior estimate of spatial distances")+  
         geom_vline(xintercept=0, colour="firebrick", linetype="dashed", size=0.8)+
     geom_hline(yintercept=0, colour="firebrick", linetype="dashed", size=0.8)+
-    theme_bw(base_size=12)+
+    theme_bw(base_size=10)+
     theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
           panel.background = element_blank(), axis.line = element_line(colour = "black"),
           legend.position="none")
@@ -888,7 +885,132 @@ lo_spa
 #                     guides(fill=guide_legend(nrow=1, byrow=TRUE))+
 #                                  theme(legend.position="top"))
 
-fig3 <-    plot_grid(gen_hi, lo_spa, gen_spa, gen_lo, hi_spa, hi_lo)
+fig3 <-    plot_grid(gen_hi, lo_spa, gen_spa, gen_lo, hi_spa, hi_lo, labels="auto")
 fig3
 
 ggsave("fig/figureS2.pdf", fig3, width=220, height=150, units="mm", dpi=300)
+
+#coul=c("#CBCE91FF", "#EA738DFF","#00203FFF", "#ADEFD1FF", "#808080")
+coul=c("#ffe599", "#a13030", "#d8a91c", "#29431d", "#783f04")
+
+# cheching the interesting taxa
+int_loc1 <- plot_cor[plot_cor$locality_uCI<dropResults$locality_lCI[dropResults$Genus_dropped=="none"],]
+annotation <- data.frame(x=int_loc$locality_Estimate, Group=int_loc$Group, label=int_loc$Genus_dropped)
+annotation$x <- annotation$x-0.01
+int_loc2 <- plot_cor[plot_cor$locality_lCI>dropResults$locality_uCI[dropResults$Genus_dropped=="none"],]
+int_loc2$locality_Estimate <- int_loc2$locality_Estimate+0.01
+annotation <- rbind(annotation, data.frame(x=int_loc2$locality_Estimate, Group=int_loc2$Group, label=int_loc2$Genus_dropped))
+loc <- ggplot(data=plot_cor, aes(x=locality_Estimate, y=Group, fill=Group))+
+    geom_rect(aes(xmin=dropResults$locality_lCI[dropResults$Genus_dropped=="none"], xmax=dropResults$locality_uCI[dropResults$Genus_dropped=="none"], ymin=-Inf, ymax=Inf),
+              fill="#6C5B7B", alpha=0.05)+
+    geom_errorbar(aes(xmin = locality_lCI, xmax = locality_uCI),size=0.7, alpha=0.3, width=0.1,  position=position_jitter(seed=40), colour="black")+
+    geom_point(shape=21, size=2, alpha=0.8, position=position_jitter(seed=40))+
+    scale_fill_manual(values=coul)+
+    labs(x="Posterior estimate of shared locality", y="")+
+        geom_vline(xintercept=0, colour="firebrick", linetype="dashed", size=1)+
+    geom_hline(yintercept=0, colour="firebrick", linetype="dashed", size=1)+
+    theme_bw(base_size=10)+
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          panel.background = element_blank(), axis.line = element_line(colour = "black"),
+          legend.position= "none")+
+    geom_text(data=annotation, aes(x=x, y=Group, label=label),
+              colour="black", position=position_jitter(height=0.2, seed=80),
+             size=2)
+
+loc
+
+# cheching the interesting taxa
+int <- plot_cor[plot_cor$spatial_uCI<dropResults$spatial_lCI[dropResults$Genus_dropped=="none"],]
+annotation <- data.frame(x=int$spatial_Estimate, Group=int$Group, label=int$Genus_dropped)
+#annotation$x <- annotation$x-0.01
+int2 <- plot_cor[plot_cor$spatial_lCI>dropResults$spatial_uCI[dropResults$Genus_dropped=="none"],]
+#int_loc2$spatial_Estimate <- int_loc2$spatial_Estimate+0.01
+annotation <- rbind(annotation, data.frame(x=int2$spatial_Estimate, Group=int2$Group, label=int2$Genus_dropped))
+
+spa <- ggplot(data=plot_cor, aes(x=spatial_Estimate, y=Group, fill=Group))+
+    geom_rect(aes(xmin=dropResults$spatial_lCI[dropResults$Genus_dropped=="none"], xmax=dropResults$spatial_uCI[dropResults$Genus_dropped=="none"], ymin=-Inf, ymax=Inf),
+              fill="#355C7D", alpha=0.05)+
+    geom_errorbar(aes(xmin = spatial_lCI, xmax = spatial_uCI),size=0.7, alpha=0.3, width=0.1,  position=position_jitter(seed=40), colour="black")+
+    geom_point(shape=21, size=2, alpha=0.8, position=position_jitter(seed=40))+
+        scale_x_reverse()+
+    scale_fill_manual(values=coul)+
+    labs(x="Posterior estimate of spatial distance", y="")+
+        geom_vline(xintercept=0, colour="firebrick", linetype="dashed", size=1)+
+    geom_hline(yintercept=0, colour="firebrick", linetype="dashed", size=1)+
+    theme_bw(base_size=10)+
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          panel.background = element_blank(), axis.line = element_line(colour = "black"),
+          legend.position= "none")+
+        geom_text(data=annotation, aes(x=x, y=Group, label=label),
+              colour="black", position=position_jitter(height=0.2, seed=11),
+             size=2)
+
+spa
+
+
+int <- plot_cor[plot_cor$hi_uCI<dropResults$hi_lCI[dropResults$Genus_dropped=="none"],]
+annotation <- data.frame(x=int$hi_Estimate, Group=int$Group, label=int$Genus_dropped)
+#annotation$x <- annotation$x-0.01
+int2 <- plot_cor[plot_cor$hi_lCI>dropResults$hi_uCI[dropResults$Genus_dropped=="none"],]
+#int_loc2$spatial_Estimate <- int_loc2$spatial_Estimate+0.01
+annotation <- rbind(annotation, data.frame(x=int2$hi_Estimate, Group=int2$Group, label=int2$Genus_dropped))
+                                        # none
+                                        # let's annotate the significant one then.
+int <-plot_cor[plot_cor$hi_lCI>0,]
+annotation <- data.frame(x=int$hi_Estimate, Group=int$Group, label=int$Genus_dropped)
+hi <- ggplot(data=plot_cor, aes(x=hi_Estimate, y=Group, fill=Group))+
+    geom_rect(aes(xmin=dropResults$hi_lCI[dropResults$Genus_dropped=="none"], xmax=dropResults$hi_uCI[dropResults$Genus_dropped=="none"], ymin=-Inf, ymax=Inf),
+              fill="#f897a1", alpha=0.05)+
+    geom_errorbar(aes(xmin = hi_lCI, xmax = hi_uCI),size=0.7, alpha=0.3, width=0.1,  position=position_jitter(seed=40), colour="black")+
+    geom_point(shape=21, size=2, alpha=0.8, position=position_jitter(seed=40))+
+    scale_fill_manual(values=coul)+
+    labs(x="Posterior estimate of hybridicity distance", y="")+
+        geom_vline(xintercept=0, colour="firebrick", linetype="dashed", size=1)+
+    geom_hline(yintercept=0, colour="firebrick", linetype="dashed", size=1)+
+    theme_bw(base_size=10)+
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          panel.background = element_blank(), axis.line = element_line(colour = "black"),
+          legend.position= "none")+
+            geom_text(data=annotation, aes(x=x+0.005, y=Group, label=label),
+              colour="black", position=position_jitter(height=0.2, seed=10),
+             size=2)
+
+hi
+
+int <-plot_cor[plot_cor$genetic_dist_uCI<dropResults$genetic_dist_lCI[dropResults$Genus_dropped=="none"],]
+
+annotation <- data.frame(x=int$genetic_dist_Estimate, Group=int$Group, label=int$Genus_dropped)
+#annotation$x <- annotation$x-0.01
+int2 <- plot_cor[plot_cor$genetic_dist_lCI>dropResults$genetic_dist_uCI[dropResults$Genus_dropped=="none"],]
+
+#int_loc2$spatial_Estimate <- int_loc2$spatial_Estimate+0.01
+annotation <- rbind(annotation, data.frame(x=int2$genetic_dist_Estimate, Group=int2$Group, label=int2$Genus_dropped))
+
+annotation
+
+gen <- ggplot(data=plot_cor, aes(x=genetic_dist_Estimate, y=Group, fill=Group))+
+    geom_rect(aes(xmin=dropResults$genetic_dist_lCI[dropResults$Genus_dropped=="none"], xmax=dropResults$genetic_dist_uCI[dropResults$Genus_dropped=="none"], ymin=-Inf, ymax=Inf),
+              fill="#F8B195", alpha=0.05)+
+    geom_errorbar(aes(xmin = genetic_dist_lCI, xmax = genetic_dist_uCI),size=0.7, alpha=0.3, width=0.1,  position=position_jitter(seed=40), colour="black")+
+    geom_point(shape=21, size=2, alpha=0.8, position=position_jitter(seed=40))+
+    scale_fill_manual(values=coul)+
+        scale_x_reverse()+
+    labs(x="Posterior estimate of genetic distance", y="")+
+        geom_vline(xintercept=0, colour="firebrick", linetype="dashed", size=1)+
+    geom_hline(yintercept=0, colour="firebrick", linetype="dashed", size=1)+
+    theme_bw(base_size=10)+
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          panel.background = element_blank(), axis.line = element_line(colour = "black"),
+          legend.position= "none")+
+                geom_text(data=annotation, aes(x=x+0.005, y=Group, label=label),
+              colour="black", position=position_jitter(height=0.2, seed=10),
+             size=2)
+
+gen
+
+Fig3 <- plot_grid(spa, loc, hi, gen, labels="auto")
+
+ggsave("fig/figure3.pdf", Fig3, width=180, height=150, units="mm", dpi=300)
+
+Fig3
+
